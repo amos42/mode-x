@@ -25,6 +25,11 @@ void clear_screen( char *vram, char color );
 void send_image_to_vram( char *vdes, int offs, char* img, int width, int height );
 void put_image_to_vram( char *vram, int x, int y, char* img, int width, int height );
 
+unsigned char* make_image_mask(char* img, int img_x, int img_y, char trans_color);
+char* make_shift_image(char* img, int width, int height, int* new_width, int* new_height);
+void put_sprite_to_vram( char *vram, int x, int y, char* img, int width, int height, unsigned char* mask );
+void put_sprite_to_vram2(char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4]);
+
 
 #ifdef __cplusplus
 }

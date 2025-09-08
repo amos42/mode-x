@@ -1,0 +1,12 @@
+{
+    "C_Cpp.formatting": "vcFormat",
+    "files.associations": {
+        "LOAD_FNT.C": "cpp",
+        "IMAGE.C": "cpp",
+        "ZOOMDEMO.C": "cpp",
+        "PALETTE.C": "cpp",
+        "UTIL.C": "cpp",
+        "MIDI.C": "cpp",
+        "PICTURE.C": "cpp"
+    }
+}
