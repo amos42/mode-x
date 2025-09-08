@@ -8,6 +8,15 @@ int _vwidth = 320 / 4;
 int _vheight = 200;
 
 
+// 화면 모드를 설정한다
+void set_screen_mode(int mode)
+{
+    union REGS regs;
+    regs.h.ah = 0x00;
+    regs.h.al = mode;
+    int86(0x10, &regs, &regs);
+}
+
 // 세로 해상도를 240으로 변경한다
 void set_crtc_to_240_lines()
 {
@@ -85,7 +94,7 @@ void set_start_addr(unsigned int start_offs)
 }
 
 // 시작 오프셋의 상위 주소만 설정한다
-void sset_start_addr_hi(unsigned char start_offs_hi)
+void set_start_addr_hi(unsigned char start_offs_hi)
 {
     outportb(CRTC_INDEX, CRTC_START_ADDR_HI);
     outportb(CRTC_DATA, start_offs_hi);

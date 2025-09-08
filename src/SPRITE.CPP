@@ -1,27 +1,6 @@
 #include "mode_x.h"
 #include <stdlib.h>
 
-// 이미지 마스크 생성
-unsigned char* make_image_mask(char* img, int img_x, int img_y, char trans_color)
-{
-    unsigned char* img_mask = (unsigned char*)malloc(img_x / 8 * img_y);
-
-    for (int i = 0; i < img_y; i++) {
-        for (int j = 0; j < img_x / 8; j++) {
-            unsigned char m = 0;
-            for (int k = 0; k < 8; k++) {
-                if (img[i * img_x + j * 8 + k] != trans_color) {
-                    m |= (1 << (7 - k));
-                    //m |= (1 << k);
-                }
-            }
-            img_mask[i * (img_x / 8) + j] = m;
-        }
-    }
-
-    return img_mask;
-}
-
 // 이미지 크기를 4의 배수로 맞추기
 char* make_shift_image(char* img, int width, int height, int* new_width, int* new_height)
 {
