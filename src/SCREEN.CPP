@@ -7,7 +7,7 @@ void clear_screen( char *vram, char color )
 
     for( int i = 0; i < _vheight; i++ ) {
         char *vdes = vram;
-        for( int j = 0; j < _vwidth; j++ ) {
+        for( int j = 0; j < 320/4; j++ ) {
             *vdes++ = color;
         }
         vram += _vwidth;
