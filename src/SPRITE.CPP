@@ -1,8 +1,27 @@
 #include "mode_x.h"
 #include <stdlib.h>
 
+
+// 투명색을 기준으로 마스크 이미지를 생성한다
+unsigned char* make_image_mask( char* img, int img_x, int img_y, char trans_color, int endian )
+{
+    unsigned char* img_mask = (unsigned char*)malloc(img_x / 8 * img_y);
+    for (int i = 0; i < img_y; i++) {
+        for (int j = 0; j < img_x / 8; j++) {
+            unsigned char m = 0;
+            for (int k = 0; k < 8; k++) {
+                if (img[i * img_x + j * 8 + k] != trans_color) {
+                    m |= (endian)? (1 << (7 - k)) : (1 << k);
+                }
+            }
+            img_mask[i * (img_x / 8) + j] = m;
+        }
+    }
+    return img_mask;
+}
+
 // 이미지 크기를 4의 배수로 맞추기
-char* make_shift_image(char* img, int width, int height, int* new_width, int* new_height)
+char* make_shift_image( char* img, int width, int height, int* new_width, int* new_height )
 {
     int w = width + 3;
     w &= ~0x3;
@@ -28,12 +47,13 @@ char* make_shift_image(char* img, int width, int height, int* new_width, int* ne
 }
 
 // VRAM to VRAM 스프라이트 전송
-void put_sprite_vram_to_vram(char* des, char* src, int width, int height, unsigned char* mask)
+void copy_sprite_vram_to_vram( char* des, char* src, int width, int height, unsigned char* mask )
 {
     set_write_mode(1);
 
+    int wloop = width / 4;
     for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width / 4; j += 2) {
+        for (int j = 0; j < wloop; j += 2) {
             unsigned char m = *mask++;
 
             int dummy = *(src + j);
@@ -47,14 +67,13 @@ void put_sprite_vram_to_vram(char* des, char* src, int width, int height, unsign
         src += _vwidth;
         des += _vwidth;
     }
-
-    set_write_mode(0);
 }
 
 // 스프라이트 그리기
-void put_sprite_vram_to_vram2(char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4])
+void put_sprite_vram_to_vram( char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4] )
 {
     char* des = vram + y * _vwidth + x / 4;
     int idx = x & 0x3;
-    put_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
+    width += (idx != 0) ? 4 : 0;
+    copy_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
 }

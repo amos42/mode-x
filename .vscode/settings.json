@@ -7,6 +7,9 @@
         "PALETTE.C": "cpp",
         "UTIL.C": "cpp",
         "MIDI.C": "cpp",
-        "PICTURE.C": "cpp"
+        "PICTURE.C": "cpp",
+        "PCX2GPG.C": "cpp",
+        "PCX2GPG copy.C": "cpp",
+        "PCX2BIN.C": "cpp"
     }
 }

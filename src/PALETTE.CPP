@@ -4,7 +4,7 @@
 
 
 // 특정 팔레트 색 설정
-void set_pallete(int idx, unsigned char red, unsigned char green, unsigned char blue)
+void set_palette(int idx, unsigned char red, unsigned char green, unsigned char blue)
 {
     outportb(DAC_INDEX, idx);
     outportb(DAC_DATA, red);
@@ -13,11 +13,11 @@ void set_pallete(int idx, unsigned char red, unsigned char green, unsigned char 
 }
 
 
-// 전체 팔레트 설정
-void set_pallete_all(unsigned char* pal)
+// 복수개 팔레트 설정
+void set_palette_multi(unsigned char* pal, int start, int count)
 {
-    outportb(DAC_INDEX, 0);
-    for (int i = 0; i < 256; i++) {
+    outportb(DAC_INDEX, start);
+    for (int i = 0; i < count; i++) {
         outportb(DAC_DATA, *pal++);
         outportb(DAC_DATA, *pal++);
         outportb(DAC_DATA, *pal++);

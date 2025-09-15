@@ -9,6 +9,7 @@
 #define   GC_FUNC                   0x03
 #define   GC_READ_MAP_SELECT        0x04
 #define   GC_MODE                   0x05
+#define   GC_BITMASK                0x08
 
 #define SA_INDEX   0x3C4
 #define SA_DATA    0x3C5

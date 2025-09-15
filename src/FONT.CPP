@@ -3,13 +3,6 @@
 #include <dos.h>
 
 
-// 비트마스크 레지스터 설정
-void set_bitmask(unsigned char mask) {
-    outportb(GC_INDEX, 0x08);
-    outportb(GC_DATA, mask);
-}
-
-
 void put_font_to_vram(char *des, unsigned char* font, int x, int y, int width, int height, char color)
 {
     set_write_mode(2);

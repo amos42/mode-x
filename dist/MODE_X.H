@@ -22,9 +22,10 @@ void wait_vsync();
 void set_start_addr(unsigned int start_offs);
 void set_start_addr_hi(unsigned char start_offs_hi);
 void set_virtual_width(int width);
+void set_bitmask(unsigned char mask);
 
-void set_pallete(int idx, unsigned char red, unsigned char green, unsigned char blue);
-void set_pallete_all(unsigned char* pal);
+void set_palette(int idx, unsigned char red, unsigned char green, unsigned char blue);
+void set_palette_multi(unsigned char* pal, int start, int count);
 
 void clear_screen( char *vram, char color );
 void send_image_to_vram( char *vdes, int offs, char* img, int width, int height );

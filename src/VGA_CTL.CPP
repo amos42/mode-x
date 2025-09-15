@@ -33,7 +33,8 @@ void set_crtc_to_240_lines()
 void turn_off_chain4()
 {
     outportb(SA_INDEX, SA_MEMORY_MODE);
-    outportb(SA_DATA, inportb(SA_DATA) & ~8);
+    // outportb(SA_DATA, inportb(SA_DATA) & ~8);
+    outportb(SA_DATA, 0x06);
 }
 
 // 뱅크 마스크 설정
@@ -107,4 +108,11 @@ void set_virtual_width(int width)
     outportb(CRTC_DATA, (width / (4 * 2)) & 0xFF);  // 1바이트 = 4픽셀, 단위는 1/2로 지정
 
     _vwidth = width / 4;
+}
+
+// 비트마스크 레지스터 설정
+void set_bitmask(unsigned char mask)
+{
+    outportb(GC_INDEX, GC_BITMASK);
+    outportb(GC_DATA, mask);
 }

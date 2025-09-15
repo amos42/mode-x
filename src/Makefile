@@ -19,18 +19,18 @@ compiler = tcc
   $(tc_path)\$(bin_path)\$(compiler) -c -ml -1 -f- -O -I$(tc_path)\include -E$(ta_path)\tasm.exe $<
 
 
-mode_x.lib : mode_x.obj palette.obj screen.obj image.obj sprite.obj font.obj gdi.obj
+mode_x.lib : vga_ctl.obj palette.obj screen.obj image.obj sprite.obj font.obj gdi.obj
   # Make Library
   @del mode_x.lib > NUL
-  @tlib mode_x.lib /c +mode_x +palette +screen +image +sprite +font +gdi
+  @tlib mode_x.lib /c +vga_ctl +palette +screen +image +sprite +font +gdi
   @del mode_x.bak > NUL
 
 
 # Common Module
-mode_x.obj   : mode_x.cpp  mode_x.h vga_reg.h
-palette.obj  : palette.cpp mode_x.h
-screen.obj   : screen.cpp  mode_x.h
-image.obj    : image.cpp   mode_x.h
-sprite.obj   : sprite.cpp  mode_x.h
-font.obj     : font.cpp    mode_x.h
-gdi.obj      : gdi.cpp     mode_x.h
+vga_ctl.obj  : vga_ctl.cpp  mode_x.h vga_reg.h
+palette.obj  : palette.cpp  mode_x.h
+screen.obj   : screen.cpp   mode_x.h
+image.obj    : image.cpp    mode_x.h
+sprite.obj   : sprite.cpp   mode_x.h
+font.obj     : font.cpp     mode_x.h
+gdi.obj      : gdi.cpp      mode_x.h

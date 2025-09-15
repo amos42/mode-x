@@ -7,6 +7,12 @@
 
 char* vram = (char*)0xA0000000;
 
+void set_screen_mode(int mode) {
+    union REGS regs;
+    regs.h.ah = 0x00;
+    regs.h.al = mode;
+    int86(0x10, &regs, &regs);
+}
 
 void set_pallete_all(unsigned char* pal)
 {
@@ -247,17 +253,12 @@ void set_bitmask(unsigned char mask) {
 unsigned char font8x8[1][8] = {
     {0x18,0x24,0x24,0x42,0x7E,0x42,0x42,0x00}
 };
-// 쓰기 모드2 설정
-void set_write_mode2() {
-    outp(GC_INDEX, 0x05);
-    // outp(GC_DATA, inp(GC_DATA) & 0xFC | 0x02); // write mode 2
-    outp(GC_DATA, 0x02); // write mode 2
-}
+
 // 글자 하나 출력 (8x8)
 void draw_char_mode2(int x, int y, char ch, char color) {
     unsigned short offset = (y * 80) + (x >> 2); // 바이트 오프셋
 
-    set_write_mode2();
+    set_write_mode(2);
 
     for (int row = 0; row < 8; row++) {
         unsigned char fontrow = font8x8[0][row];

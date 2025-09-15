@@ -5,11 +5,11 @@ void clear_screen( char *vram, char color )
 {
     set_bank_mask(0xF);
 
+    int skip = _vwidth - 320;
     for( int i = 0; i < _vheight; i++ ) {
-        char *vdes = vram;
-        for( int j = 0; j < 320/4; j++ ) {
-            *vdes++ = color;
+        for( int j = 0; j < _vwidth; j++ ) {
+            *vram++ = color;
         }
-        vram += _vwidth;
+        vram += skip;
     }
 }
