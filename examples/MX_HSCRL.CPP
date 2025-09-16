@@ -92,7 +92,7 @@ void main()
     set_virtual_width(320 * 2);
 
     char* pal = (char*)malloc(256 * 3);
-    FILE* fp = fopen("pre1_000.pal", "rb");
+    FILE* fp = fopen("lych_00.pal", "rb");
     fread(pal, 256 * 3, 1, fp);
     fclose(fp);
     set_palette_multi((unsigned char *)pal, 0, 256);
@@ -100,12 +100,12 @@ void main()
 
     char* buf = (char*)malloc(320 * 200);
 
-    fp = fopen("pre1_001.bin", "rb");
+    fp = fopen("lych_01.bin", "rb");
     fread(buf, 320 * 200, 1, fp);
     fclose(fp);
     send_image_to_vram(_vram, 0, buf, 320, 200);
 
-    fp = fopen("pre1_002.bin", "rb");
+    fp = fopen("lych_02.bin", "rb");
     fread(buf, 320 * 200, 1, fp);
     fclose(fp);
     send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);

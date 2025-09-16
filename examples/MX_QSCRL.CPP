@@ -92,7 +92,7 @@ void main()
     set_virtual_width(320 * 2);
  
     char* pal = (char*)malloc(256 * 3);
-    FILE* fp = fopen("ep1_000.pal", "rb");
+    FILE* fp = fopen("ep1_00.pal", "rb");
     fread(pal, 256 * 3, 1, fp);
     fclose(fp);
     set_palette_multi((unsigned char *)pal, 0, 256);
@@ -100,18 +100,18 @@ void main()
 
     char* buf = (char*)malloc(320 * 200);
 
-    fp = fopen("ep1_001.bin", "rb");
+    fp = fopen("ep1_01.bin", "rb");
     fread(buf, 320 * 200, 1, fp);
     fclose(fp);
     send_image_to_vram(_vram, 0, buf, 320, 200);
     send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
 
-    fp = fopen("ep1_002.bin", "rb");
+    fp = fopen("ep1_02.bin", "rb");
     fread(buf, 320 * 200, 1, fp);
     fclose(fp);
     send_image_to_vram(_vram + 0x3E80*2, 0, buf, 320, 200);
     send_image_to_vram(_vram + 0x3E80*2 + 320/4, 0, buf, 320, 200);
-    
+
     free(buf);
 
     int ch = 0;

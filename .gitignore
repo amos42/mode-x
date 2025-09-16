@@ -1,3 +1,5 @@
 *.bak
 *.obj
-src/mode_x.lib
+*.swp
+src/MODE_X.lib
+examples/VGA_REG.h
