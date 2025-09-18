@@ -3,6 +3,7 @@
 #include <conio.h>
 #include <dos.h>
 #include <mem.h>
+#include <io.h>
 #include "vga_reg.h"
 
 char* _vram = (char*)0xA0000000;
@@ -84,6 +85,19 @@ void set_start_addr(unsigned int start_offs)
     outportb(CRTC_DATA, start_offs & 0xff);
 }
 
+char *load_file(char *filename)
+{
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) return NULL;
+
+    size_t len = (size_t)filelength(fileno(fp));
+    char *buf = (char *)malloc(len);
+    if (buf != NULL) fread(buf, len, 1, fp);
+    fclose(fp);
+
+    return buf;
+}
+
 
 void main()
 {
@@ -91,26 +105,21 @@ void main()
     turn_off_chain4();
     set_virtual_width(320 * 2);
 
-    char* pal = (char*)malloc(256 * 3);
-    FILE* fp = fopen("lych_00.pal", "rb");
-    fread(pal, 256 * 3, 1, fp);
-    fclose(fp);
-    set_palette_multi((unsigned char *)pal, 0, 256);
-    free(pal);
-
-    char* buf = (char*)malloc(320 * 200);
-
-    fp = fopen("lych_01.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
-    send_image_to_vram(_vram, 0, buf, 320, 200);
-
-    fp = fopen("lych_02.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
-    send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
-    
-    free(buf);
+    char *pal = load_file("lych_00.pal");
+    if (pal != NULL) {
+        set_palette_multi((unsigned char *)pal, 0, 256);
+        free(pal);
+    }
+    char *buf = load_file("lych_01.bin");
+    if (buf != NULL) {
+        send_image_to_vram(_vram, 0, buf, 320, 200);
+        free(buf);
+    }
+    buf = load_file("lych_02.bin");
+    if (buf != NULL) {
+        send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
+        free(buf);
+    }
 
     int ch = 0;
     int idx = 0;

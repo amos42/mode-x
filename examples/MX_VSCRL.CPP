@@ -3,11 +3,14 @@
 #include <conio.h>
 #include <dos.h>
 #include <mem.h>
+#include <io.h>
 #include "vga_reg.h"
+
 
 char* _vram = (char*)0xA0000000;
 int _vwidth = 320 / 4;
 int _vheight = 200;
+
 
 void set_screen_mode(int mode)
 {
@@ -27,6 +30,11 @@ void turn_off_chain4()
     outportb(CRTC_DATA, 0x00);
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
     outportb(CRTC_DATA, 0xA3);
+}
+
+void set_crtc_to_240_lines() {
+    outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
+    outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
 }
 
 void set_bank_mask(int mask)
@@ -77,32 +85,50 @@ void set_start_addr(unsigned int start_offs)
     outportb(CRTC_DATA, start_offs & 0xff);
 }
 
+char *load_file(char *filename)
+{
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) return NULL;
+
+    size_t len = filelength(fileno(fp));
+    char *buf = (char *)malloc(len);
+    if (buf != NULL) fread(buf, len, 1, fp);
+    fclose(fp);
+
+    return buf;
+}
+
+
+// #define LINES_240
 
 void main()
 {
     set_screen_mode(0x13);
     turn_off_chain4();
- 
-    char* pal = (char*)malloc(256 * 3);
-    FILE* fp = fopen("ep1_00.pal", "rb");
-    fread(pal, 256 * 3, 1, fp);
-    fclose(fp);
-    set_palette_multi((unsigned char *)pal, 0, 256);
-    free(pal);
 
-    char* buf = (char*)malloc(320 * 200);
+    #ifdef LINES_240
+    set_crtc_to_240_lines();
+    int screen_height = 240;
+    #else
+    int screen_height = 200;
+    #endif
 
-    fp = fopen("ep1_01.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
-    send_image_to_vram(_vram, 0, buf, 320, 200);
+    char *pal = load_file("ep1_00.pal");
+    if (pal != NULL) {
+        set_palette_multi((unsigned char *)pal, 0, 256);
+        free(pal);
+    }
+    char *buf = load_file("ep1_01.bin");
+    if (buf != NULL) {
+        send_image_to_vram(_vram, 0, buf, 320, 200);
+        free(buf);
+    }
+    buf = load_file("ep1_02.bin");
+    if (buf != NULL) {
+        send_image_to_vram(_vram + 0x3E80, 0, buf, 320, 200);
+        free(buf);
+    }
 
-    fp = fopen("ep1_02.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
-    send_image_to_vram(_vram + 0x3E80, 0, buf, 320, 200);
-
-    free(buf);
 
     int ch = 0;
     int idx = 0;
@@ -117,7 +143,7 @@ void main()
             }
             break;
         case 80: // down arrow
-            if (idx < 320/4*(200-1)) {
+            if (idx < 320/4*(400 - screen_height - 1)) {
                 idx += 320/4;
                 set_start_addr(idx);
             }

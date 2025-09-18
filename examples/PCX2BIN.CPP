@@ -21,13 +21,17 @@ char* data;
 void write_pic_file(FILE* fp, FILE* outfp)
 {
     unsigned char count, indata;
-    fseek(fp, 0x80, SEEK_SET);
+    long len = filelength(fileno(fp));
+    len -= 128 + 1 + 768; // 128(헤더) + 1 + 768(팔레트)
+    fseek(fp, 128, SEEK_SET);
 
     do {
         if (fread(&indata, 1, 1, fp) == 0) break;
+        if (--len < 0) break;
         if ((indata & 0xC0) == 0xC0) {
             count = indata & 0x3F;
             fread(&indata, 1, 1, fp);
+            if (--len < 0) break;
             for (int i = 0; i < count; i++) {
                 fwrite(&indata, 1, 1, outfp);
             }

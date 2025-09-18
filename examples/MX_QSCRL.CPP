@@ -3,6 +3,7 @@
 #include <conio.h>
 #include <dos.h>
 #include <mem.h>
+#include <io.h>
 #include "vga_reg.h"
 
 char* _vram = (char*)0xA0000000;
@@ -27,6 +28,11 @@ void turn_off_chain4()
     outportb(CRTC_DATA, 0x00);
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
     outportb(CRTC_DATA, 0xA3);
+}
+
+void set_crtc_to_240_lines() {
+    outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
+    outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
 }
 
 void set_virtual_width(int width)
@@ -84,34 +90,47 @@ void set_start_addr(unsigned int start_offs)
     outportb(CRTC_DATA, start_offs & 0xff);
 }
 
+char *load_file(char *filename)
+{
+    FILE *fp = fopen(filename, "rb");
+    if (fp == NULL) return NULL;
+
+    size_t len = (size_t)filelength(fileno(fp));
+    char *buf = (char *)malloc(len);
+    fread(buf, len, 1, fp);
+    fclose(fp);
+
+    return buf;
+}
+
+
+//#define LINES_240
 
 void main()
 {
     set_screen_mode(0x13);
     turn_off_chain4();
-    set_virtual_width(320 * 2);
  
-    char* pal = (char*)malloc(256 * 3);
-    FILE* fp = fopen("ep1_00.pal", "rb");
-    fread(pal, 256 * 3, 1, fp);
-    fclose(fp);
+    #ifdef LINES_240
+    set_crtc_to_240_lines();
+    int screen_height = 240;
+    #else
+    int screen_height = 200;
+    #endif
+    set_virtual_width(320 * 2);
+
+    char *pal = load_file("ep1_00.pal");
     set_palette_multi((unsigned char *)pal, 0, 256);
     free(pal);
 
-    char* buf = (char*)malloc(320 * 200);
-
-    fp = fopen("ep1_01.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
+    char *buf = load_file("ep1_01.bin");
     send_image_to_vram(_vram, 0, buf, 320, 200);
     send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
+    free(buf);
 
-    fp = fopen("ep1_02.bin", "rb");
-    fread(buf, 320 * 200, 1, fp);
-    fclose(fp);
+    buf = load_file("ep1_02.bin");
     send_image_to_vram(_vram + 0x3E80*2, 0, buf, 320, 200);
     send_image_to_vram(_vram + 0x3E80*2 + 320/4, 0, buf, 320, 200);
-
     free(buf);
 
     int ch = 0;
@@ -128,7 +147,7 @@ void main()
             }
             break;
         case 80: // down arrow
-            if (y < 200-1) {
+            if (y < 400-screen_height-1) {
                 y ++;
                 set_start_addr(x + y * 320U/4*2);
             }
