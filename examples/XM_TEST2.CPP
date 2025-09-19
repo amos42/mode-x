@@ -128,7 +128,7 @@ void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
     }
 }
 
-void gen_screen(char* buf, int vwidth, int width, int height, char color1, char color2, char color3)
+void make_checked_screen(char* buf, int vwidth, int width, int height, char color1, char color2, char color3)
 {
     int i, j;
     for (i = 0; i < height / 8; i++) {
@@ -379,10 +379,10 @@ void main()
     fclose(fp);
 
     char* p1 = (char*)malloc(64000);
-    gen_screen(p1, 320, 320, 200, 0x07, 0x08, 0x01);
+    make_checked_screen(p1, 320, 320, 200, 0x07, 0x08, 0x01);
 
     char* p2 = (char*)malloc(64000);
-    gen_screen(p2, 320, 320, 200, 0x03, 0x0B, 0x04);
+    make_checked_screen(p2, 320, 320, 200, 0x03, 0x0B, 0x04);
 
     set_screen_mode(0x13);
 

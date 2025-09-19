@@ -47,7 +47,7 @@ char* make_shift_image( char* img, int width, int height, int* new_width, int* n
 }
 
 // VRAM to VRAM 스프라이트 전송
-void copy_sprite_vram_to_vram( char* des, char* src, int width, int height, unsigned char* mask )
+void send_sprite_vram_to_vram( char* des, char* src, int width, int height, unsigned char* mask )
 {
     set_write_mode(1);
 
@@ -75,5 +75,5 @@ void put_sprite_vram_to_vram( char *vram, int x, int y, char* imgs[4], int width
     char* des = vram + y * _vwidth + x / 4;
     int idx = x & 0x3;
     width += (idx != 0) ? 4 : 0;
-    copy_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
+    send_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
 }
