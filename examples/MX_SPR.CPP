@@ -220,7 +220,7 @@ void main()
     set_screen_mode(0x13);
     turn_off_chain4();
 
-    char* pal = load_file("pal.bin");
+    char* pal = load_file("i104x76.pal");
     set_palette_multi((unsigned char *)pal, 0, 256);
     free(pal);
 

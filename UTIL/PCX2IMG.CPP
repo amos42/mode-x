@@ -60,7 +60,7 @@ int main(int argc, char* argv[])
     char in_filename[13], out_filename[13], pal_filename[13];
 
     if (argc < 2) {
-        cputs("Usage : PCX2BIN <PCX file name>\n\r");
+        cputs("Usage : PCX2IMG <PCX file name>\n\r");
         exit(0);
     }
 
@@ -71,7 +71,7 @@ int main(int argc, char* argv[])
     strupr(out_filename);
     strupr(pal_filename);
     strcat(in_filename, ".PCX");
-    strcat(out_filename, ".BIN");
+    strcat(out_filename, ".IMG");
     strcat(pal_filename, ".PAL");
 
     printf("%s ==> %s\n", in_filename, out_filename);
