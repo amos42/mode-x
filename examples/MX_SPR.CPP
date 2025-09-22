@@ -199,6 +199,23 @@ void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
     }
 }
 
+// VRAM 상의 특정 위치에 bar를 그린다.
+void draw_bar_to_vram( char *vdes, int offs, int width, int height, char color )
+{
+    int wloop = width / 4;
+    for (int k = 0; k < 4; k++) {
+        select_bank((offs + k) % 4);
+
+        char* des = vdes;
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < wloop; j ++) {
+                *des++ = color;
+            }
+            des += _vwidth - wloop;
+        }
+    }
+}
+
 void make_checked_screen(char* buf, int vwidth, int width, int height, char color1, char color2, char color3)
 {
     int i, j;
