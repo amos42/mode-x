@@ -353,6 +353,7 @@ void main()
 
     long idx = 200;
     long limit_idx = 200;
+    int speed = 1;
 
     int status = 0;
     while (status != 2) {
@@ -377,12 +378,33 @@ void main()
                 case 0x50: // down
                     new_char_y = (char_y < screen_height - 32) ? char_y + 4 : char_y + 0;
                     break;
+                case '+':
+                    if(speed < 8) speed++;
+                    break;
+                case '-':
+                    if(speed > 1) speed--;
+                    break;
             }
         } 
 
         if (status != 0) {
             delay(100);
             continue;
+        }
+
+        int new_idx = idx - speed;
+        if (new_idx < limit_idx) {
+            if (map_y <= 0) {
+                status = 2;
+            }
+            limit_idx -= 40;
+            if (limit_idx < 0) {
+                limit_idx = 240 - 40;
+                new_idx = 240 - speed;
+            }
+            draw_one_line( limit_idx, map_y );
+            map_y--;
+            copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
         }
 
         wait_vsync();
@@ -399,26 +421,12 @@ void main()
             }
         }
 
-        idx--;
-        if (idx < limit_idx) {
-            if (map_y <= 0) {
-                status = 2;
-            }
-            limit_idx -= 40;
-            if (limit_idx < 0) {
-                limit_idx = 240 - 40;
-                idx = 240;
-            }
-            draw_one_line( limit_idx, map_y );
-            map_y--;
-            copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
-        }
-
         char_x = new_char_x;
         char_y = new_char_y;
         put_sprite_vram_to_vram(_vram + idx * 320/4, char_x, char_y, _vram + 0xB000 + 40 * _vwidth, 32, 32, msk);
         // put_vram_to_vram( _vram + idx * 320/4, char_x, char_y, _vram + 0xB000 + 40 * _vwidth , 32, 32 );
 
+        idx = new_idx;
         set_start_addr(idx * 320/4);
     
         // delay(10);

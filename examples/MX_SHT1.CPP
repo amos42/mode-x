@@ -197,6 +197,7 @@ void main()
     set_start_addr(320/4*200);
 
     long limit_idx = 200;
+    int speed = 1;
 
     long idx = 200;
     int status = 0;
@@ -210,27 +211,34 @@ void main()
                 case 0x1B: // ESC
                     status = 2;
                     break;
+                case '+':
+                    if(speed < 8) speed++;
+                    break;
+                case '-':
+                    if(speed > 1) speed--;
+                    break;
             }
-        } 
+        }
 
         if (status != 0) {
             delay(100);
             continue;
         }
 
-        wait_vsync();
-
-        idx--;
+        idx -= speed;
         if (idx < limit_idx) {
             limit_idx -= 40;
             if (limit_idx < 0) {
                 limit_idx = 240 - 40;
-                idx = 240;
+                idx = 240 - speed;
             }
             draw_one_line( limit_idx, tile_idx );
             copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
             tile_idx ^= 1;
         }
+
+        wait_vsync();
+
         set_start_addr(idx * 320/4);
 
         // delay(10);
