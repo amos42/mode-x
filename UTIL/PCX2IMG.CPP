@@ -13,6 +13,31 @@
 #include <dos.h>
 #include <malloc.h>
 
+typedef unsigned char  BYTE;
+typedef unsigned short WORD;
+
+typedef struct _PcxHeader
+{
+  BYTE	Identifier;        /* PCX Id Number (Always 0x0A) */
+  BYTE	Version;           /* Version Number */
+  BYTE	Encoding;          /* Encoding Format */
+  BYTE	BitsPerPixel;      /* Bits per Pixel */
+  WORD	XStart;            /* Left of image */
+  WORD	YStart;            /* Top of Image */
+  WORD	XEnd;              /* Right of Image */
+  WORD	YEnd;              /* Bottom of image */
+  WORD	HorzRes;           /* Horizontal Resolution */
+  WORD	VertRes;           /* Vertical Resolution */
+  BYTE	Palette[48];       /* 16-Color EGA Palette */
+  BYTE	Reserved1;         /* Reserved (Always 0) */
+  BYTE	NumBitPlanes;      /* Number of Bit Planes */
+  WORD	BytesPerLine;      /* Bytes per Scan-line */
+  WORD	PaletteType;       /* Palette Type */
+  WORD	HorzScreenSize;    /* Horizontal Screen Size */
+  WORD	VertScreenSize;    /* Vertical Screen Size */
+  BYTE	Reserved2[54];     /* Reserved (Always 0) */
+} PCXHEAD;
+
 int in_file, out_file;
 unsigned char pal_info[256][3];
 char* data;
@@ -21,9 +46,14 @@ char* data;
 void write_pic_file(FILE* fp, FILE* outfp)
 {
     unsigned char count, indata;
+    PCXHEAD hdr;
+    fread(&hdr, 128, 1, fp);
+
+    fwrite(&hdr.XEnd, sizeof(WORD), 1, outfp);
+    fwrite(&hdr.YEnd, sizeof(WORD), 1, outfp);
+
     long len = filelength(fileno(fp));
     len -= 128 + 1 + 768; // 128(헤더) + 1 + 768(팔레트)
-    fseek(fp, 128, SEEK_SET);
 
     do {
         if (fread(&indata, 1, 1, fp) == 0) break;

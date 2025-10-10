@@ -112,12 +112,12 @@ void main()
     }
     char *buf = load_file("lych_01.img");
     if (buf != NULL) {
-        send_image_to_vram(_vram, 0, buf, 320, 200);
+        send_image_to_vram(_vram, 0, buf+4, 320, 200);
         free(buf);
     }
     buf = load_file("lych_02.img");
     if (buf != NULL) {
-        send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
+        send_image_to_vram(_vram + 320/4, 0, buf+4, 320, 200);
         free(buf);
     }
 

@@ -1,4 +1,4 @@
-#include <stdio.h>
+ #include <stdio.h>
 #include <stdlib.h>
 #include <conio.h>
 #include <dos.h>
@@ -7,9 +7,13 @@
 #include "vga_reg.h"
 
 
+#define SCREEN_WIDTH    320
+#define SCREEN_HEIGHT   200
+
 char* _vram = (char*)0xA0000000;
-int _vwidth = 320 / 4;
-int _vheight = 200;
+char* _asset_vram = (char*)0xA0000000 + 0xB000;
+int _vwidth = SCREEN_WIDTH / 4;
+int _vheight = SCREEN_HEIGHT;
 
 
 void set_screen_mode(int mode)
@@ -30,6 +34,13 @@ void turn_off_chain4()
     outportb(CRTC_DATA, 0x00);
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
     outportb(CRTC_DATA, 0xA3);
+}
+
+void set_virtual_width(int width)
+{
+    outportb(CRTC_INDEX, CRTC_OFFSET);              // CRTC Offset 레지스터
+    outportb(CRTC_DATA, (width / (4 * 2)) & 0xFF);  // 1바이트 = 4픽셀, 단위는 1/2로 지정
+    _vwidth = width / 4;
 }
 
 void set_crtc_to_240_lines() {
@@ -58,20 +69,23 @@ void set_palette_multi(unsigned char* pal, int start, int count)
     }
 }
 
-// VRAM 상의 특정 위치에 bar를 그린다.
-void draw_bar_to_vram( char *vdes, int offs, int width, int height, char color )
+void wait_vsync()
 {
-    int wloop = width / 4;
-    for (int k = 0; k < 4; k++) {
-        select_bank((offs + k) % 4);
+    // while ((inportb(0x3DA) & 8) != 0);
+    // while ((inportb(0x3DA) & 8) == 0);
 
-        char* des = vdes;
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < wloop; j ++) {
-                *des++ = color;
-            }
-            des += _vwidth - wloop;
-        }
+    asm  mov    dx, 0x3DA
+    wait_vsync_off:
+    asm {
+        in      al, dx
+        test    al, 8
+        jnz     wait_vsync_off  // VSYNC 끝날 때까지 기다림
+    }
+    wait_vsync_on:
+    asm {
+        in      al, dx
+        test    al, 8
+        jz      wait_vsync_on  // VSYNC 시작될 때까지 기다림
     }
 }
 
@@ -133,26 +147,6 @@ void set_start_addr(unsigned int start_offs)
     outportb(CRTC_DATA, start_offs & 0xff);
 }
 
-void wait_vsync()
-{
-    // while ((inportb(0x3DA) & 8) != 0);
-    // while ((inportb(0x3DA) & 8) == 0);
-
-    asm  mov    dx, 0x3DA
-    wait_vsync_off:
-    asm {
-        in      al, dx
-        test    al, 8
-        jnz     wait_vsync_off  // VSYNC 끝날 때까지 기다림
-    }
-    wait_vsync_on:
-    asm {
-        in      al, dx
-        test    al, 8
-        jz      wait_vsync_on  // VSYNC 시작될 때까지 기다림
-    }
-}
-
 char *load_file(char *filename)
 {
     FILE *fp = fopen(filename, "rb");
@@ -166,194 +160,69 @@ char *load_file(char *filename)
     return buf;
 }
 
-unsigned char* make_image_mask( char* img, int width, int height, char trans_color, int endian )
-{
-    unsigned char* img_mask = (unsigned char*)malloc(width / 8 * height);
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width / 8; j++) {
-            unsigned char m = 0;
-            for (int k = 0; k < 8; k++) {
-                if (img[i * width + j * 8 + k] != trans_color) {
-                    m |= (endian)? (1 << (7 - k)) : (1 << k);
-                }
-            }
-            img_mask[i * (width / 8) + j] = m;
-        }
-    }
-    return img_mask;
-}
 
-// VRAM to VRAM 스프라이트 전송
-void send_sprite_vram_to_vram( char* des, char* src, int width, int height, unsigned char* mask )
+// VRAM 상의 특정 위치에 bar를 그린다.
+void draw_bar_to_vram( char *vdes, int offs, int width, int height, char color )
 {
-    set_write_mode(1);
+    set_write_mode(0);
 
     int wloop = width / 4;
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < wloop; j += 2) {
-            unsigned char m = *mask++;
+    for (int k = 0; k < 4; k++) {
+        select_bank((offs + k) % 4);
 
-            int dummy = *(src + j);
-            set_bank_mask(m);
-            *(des + j) = 0x00;
-
-            dummy = *(src + j + 1);
-            set_bank_mask(m >> 4);
-            *(des + j + 1) = 0x00;
-        }
-        src += _vwidth;
-        des += _vwidth;
-    }
-}
-
-void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, int height, unsigned char* mask )
-{
-    char* des = vram + y * _vwidth + x / 4;
-    int idx = x & 0x3;
-    width += (idx != 0) ? 4 : 0;
-    send_sprite_vram_to_vram(des, src, width, height, mask);
-}
-
-#define MAP_W  (320/40)
-#define MAP_H  (2096/40)
-
-char map_data[MAP_W * MAP_H] = {
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-    0,1,0,1,0,1,0,1,
-    1,0,1,0,1,0,1,0,
-};
-
-void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
-{
-    int i, j;
-    for (i = y1; i <= y2; i++) {
-        for (j = x1; j <= x2; j++) {
-            buf[i * vwidth + j] = color;
+        char* des = vdes;
+        for (int i = 0; i < height; i++) {
+            for (int j = 0; j < wloop; j ++) {
+                *des++ = color;
+            }
+            des += _vwidth - wloop;
         }
     }
 }
 
-void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
+
+#define TILE_WIDTH  40
+#define TILE_HEIGHT 40
+#define MAX_SCREEN_WIDTH  (SCREEN_WIDTH * 2 + TILE_WIDTH)
+
+void draw_one_line(int line_x, int start_idx)
 {
-    int i, j;
-    for (i = x1; i <= x2; i++) {
-        buf[y1 * vwidth + i] = color;
-        buf[y2 * vwidth + i] = color;
-    }
-    for (i = y1 + 1; i < y2; i++) {
-        buf[i * vwidth + x1] = color;
-        buf[i * vwidth + x2] = color;
+    for(int i = 0; i < SCREEN_HEIGHT; i += TILE_HEIGHT) {
+        put_vram_to_vram( _vram, line_x, i, _asset_vram + start_idx * TILE_WIDTH/4 , TILE_WIDTH, TILE_HEIGHT );
+        start_idx ^= 1;
     }
 }
 
-void draw_one_line(int line_y, int map_y)
-{
-    char *vdes = _vram + line_y * 40 * _vwidth;
-
-    for(int x = 0; x < 320/40; x++) {
-        put_vram_to_vram( _vram + 320/4, x * 40, line_y, _vram + 0xB000 + map_data[(long)map_y * 8 + x] * 40/4 , 40, 40 );
-    }
-}
-
-// #define LINES_240
 
 void main()
 {
     set_screen_mode(0x13);
     turn_off_chain4();
-
-    #ifdef LINES_240
-    set_crtc_to_240_lines();
-    int screen_height = 240;
-    #else
-    int screen_height = 200;
-    #endif
+    set_virtual_width(MAX_SCREEN_WIDTH);
 
     char *pal = load_file("tile.pal");
     if (pal != NULL) {
-        set_palette_multi((unsigned char *)pal, 0, 256);
+        set_palette_multi( (unsigned char *)pal, 0, 256 );
         free(pal);
     }
     char *buf = load_file("tile.img");
     if (buf != NULL) {
-        send_image_to_vram(_vram + 0xB000, 0, buf, 40*2, 40);
-        free(buf);
-    }
-    
-    buf = load_file("rap_00.img");
-    unsigned char *msk;
-    if (buf != NULL) {
-        send_image_to_vram(_vram + 0xB000 + 40 * _vwidth, 0, buf, 32, 32);
-        msk = make_image_mask(buf, 32, 32, 0xFF, 0);
+        send_image_to_vram( _asset_vram, 0, buf+4, TILE_WIDTH*2, TILE_HEIGHT );
         free(buf);
     }
 
-    int map_y = MAP_H - 1;
-    for(int i = screen_height - 40; i >= 0; i -= 40) {
-        draw_one_line( 200 + i, map_y );
-        map_y--;
+    long idx = 0;
+
+    int tile_idx = 0;
+    for(int i = 0; i < SCREEN_WIDTH; i += TILE_WIDTH) {
+        draw_one_line( idx + i, tile_idx );
+        tile_idx ^= 1;
     }
 
-    int offs = 320/4*200;
-    set_start_addr(320/4*200);
+    //set_start_addr(idx);
 
-    int char_x = 160;
-    int char_y = 100;
-    int new_char_x = char_x;
-    int new_char_y = char_y;
-
-    long idx = 200;
-    long limit_idx = 200;
-    int speed = 1;
+    long bound_idx = idx + SCREEN_WIDTH;
+    int speed = 4;
 
     int status = 0;
     while (status != 2) {
@@ -366,70 +235,32 @@ void main()
                 case 0x1B: // ESC
                     status = 2;
                     break;
-                case 0x4B: // left
-                    new_char_x = (char_x > 0) ? char_x - 4 : char_x - 0;
-                    break;
-                case 0x4D: // right
-                    new_char_x = (char_x < 320 - 32) ? char_x + 4 : char_x +0;
-                    break;
-                case 0x48: // up
-                    new_char_y = (char_y > 0) ? char_y - 4 : char_y - 0;
-                    break;
-                case 0x50: // down
-                    new_char_y = (char_y < screen_height - 32) ? char_y + 4 : char_y + 0;
-                    break;
-                case '+':
-                    if(speed < 8) speed++;
-                    break;
-                case '-':
-                    if(speed > 1) speed--;
-                    break;
             }
-        } 
+        }
 
         if (status != 0) {
             delay(100);
             continue;
         }
 
-        int new_idx = idx - speed;
-        if (new_idx < limit_idx) {
-            if (map_y <= 0) {
-                status = 2;
+        idx += speed;
+        if (idx + SCREEN_WIDTH > bound_idx) {
+            if (bound_idx + TILE_WIDTH > MAX_SCREEN_WIDTH) {
+                bound_idx = SCREEN_WIDTH;
+                idx = 0 + speed;
             }
-            limit_idx -= 40;
-            if (limit_idx < 0) {
-                limit_idx = 240 - 40;
-                new_idx = 240 - speed;
+            draw_one_line( bound_idx, tile_idx );
+            tile_idx ^= 1;
+            if (bound_idx - SCREEN_WIDTH - TILE_WIDTH >= 0) {
+                copy_vram_to_vram( _vram + (bound_idx - TILE_WIDTH - SCREEN_WIDTH)/4, _vram + (bound_idx)/4, TILE_WIDTH, SCREEN_HEIGHT );
+                //draw_bar_to_vram( _vram + (bound_idx - TILE_WIDTH - SCREEN_WIDTH)/4, 0, TILE_WIDTH, SCREEN_HEIGHT, bound_idx - TILE_WIDTH - SCREEN_WIDTH );
             }
-            draw_one_line( limit_idx, map_y );
-            map_y--;
-            copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
+            bound_idx += TILE_WIDTH;
         }
 
         wait_vsync();
-        
-        long blk_x1 = char_x / 40;
-        long blk_y1 = (idx + char_y) / 40;
-        long blk_x2 = (char_x + 32 - 1) / 40;
-        long blk_y2 = (idx + char_y + 32 - 1) / 40;
-        for(int by = blk_y1; by <= blk_y2; by++) {
-            for(int bx = blk_x1; bx <= blk_x2; bx++) {
-                int tile = map_data[(long)by * (320/40) + bx];
-                put_vram_to_vram( _vram, bx * 40, by * 40 + 1, _vram + 0xB000 + tile * 40/4 , 40, 40 );
-                // draw_bar_to_vram( _vram + ((long)by * 40) * _vwidth + bx * 40 / 4, 0, 40, 40, (tile == 0) ? 1 : 15 );
-            }
-        }
 
-        char_x = new_char_x;
-        char_y = new_char_y;
-        put_sprite_vram_to_vram(_vram + idx * 320/4, char_x, char_y, _vram + 0xB000 + 40 * _vwidth, 32, 32, msk);
-        // put_vram_to_vram( _vram + idx * 320/4, char_x, char_y, _vram + 0xB000 + 40 * _vwidth , 32, 32 );
-
-        idx = new_idx;
-        set_start_addr(idx * 320/4);
-    
-        // delay(10);
+        set_start_addr(idx / 4);
     }
 
     set_screen_mode(0x03);

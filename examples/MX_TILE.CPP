@@ -143,7 +143,7 @@ void main()
     }
     char *buf = load_file("tile.img");
     if (buf != NULL) {
-        send_image_to_vram(_vram + 0xB000, 0, buf, 40*2, 40);
+        send_image_to_vram(_vram + 0xB000, 0, buf+4, 40*2, 40);
         free(buf);
     }
 

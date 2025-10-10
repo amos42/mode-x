@@ -7,9 +7,19 @@
 #include "vga_reg.h"
 
 
+//#define LINES_240
+
+#define SCREEN_WIDTH    320
+#ifdef LINES_240
+#define SCREEN_HEIGHT   240
+#else
+#define SCREEN_HEIGHT   200
+#endif
+
 char* _vram = (char*)0xA0000000;
-int _vwidth = 320 / 4;
-int _vheight = 200;
+char* _asset_vram = (char*)0xA0000000 + 0xB000;
+int _vwidth = SCREEN_WIDTH / 4;
+int _vheight = SCREEN_HEIGHT;
 
 
 void set_screen_mode(int mode)
@@ -150,19 +160,18 @@ char *load_file(char *filename)
 }
 
 
+#define TILE_WIDTH  40
+#define TILE_HEIGHT 40
+#define MAX_SCREEN_HEIGHT  (SCREEN_HEIGHT * 2 + TILE_HEIGHT)
+
 void draw_one_line(int line_y, int start_idx)
 {
-    char *vdes = _vram + line_y * 40 * _vwidth;
-
-    int idx = start_idx;
-    for(int i = 0; i < 320; i += 40) {
-        put_vram_to_vram( _vram + 320/4, i, line_y, _vram + 0xB000 + idx * 40/4 , 40, 40 );
-        idx ^= 1;
+    for(int i = 0; i < SCREEN_WIDTH; i += TILE_WIDTH) {
+        put_vram_to_vram( _vram, i, line_y, _asset_vram + start_idx * TILE_WIDTH/4 , TILE_WIDTH, TILE_HEIGHT );
+        start_idx ^= 1;
     }
 }
 
-
-// #define LINES_240
 
 void main()
 {
@@ -171,9 +180,6 @@ void main()
 
     #ifdef LINES_240
     set_crtc_to_240_lines();
-    int screen_height = 240;
-    #else
-    int screen_height = 200;
     #endif
 
     char *pal = load_file("tile.pal");
@@ -183,23 +189,23 @@ void main()
     }
     char *buf = load_file("tile.img");
     if (buf != NULL) {
-        send_image_to_vram(_vram + 0xB000, 0, buf, 40*2, 40);
+        send_image_to_vram(_asset_vram, 0, buf+4, 40*2, 40);
         free(buf);
     }
 
+    long idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT;
+
     int tile_idx = 0;
-    for(int i = 0; i < screen_height; i += 40) {
-        draw_one_line( 200 + i, tile_idx );
+    for(int i = SCREEN_HEIGHT - TILE_HEIGHT; i >= 0; i -= TILE_HEIGHT) {
+        draw_one_line( idx + i, tile_idx );
         tile_idx ^= 1;
     }
 
-    int offs = 320/4*200;
-    set_start_addr(320/4*200);
+    set_start_addr(SCREEN_WIDTH/4 * idx);
 
-    long limit_idx = 200;
+    long bound_idx = idx;
     int speed = 1;
 
-    long idx = 200;
     int status = 0;
     while (status != 2) {
         if ( kbhit() ){
@@ -212,7 +218,7 @@ void main()
                     status = 2;
                     break;
                 case '+':
-                    if(speed < 8) speed++;
+                    if(speed < TILE_HEIGHT/2) speed++;
                     break;
                 case '-':
                     if(speed > 1) speed--;
@@ -226,22 +232,22 @@ void main()
         }
 
         idx -= speed;
-        if (idx < limit_idx) {
-            limit_idx -= 40;
-            if (limit_idx < 0) {
-                limit_idx = 240 - 40;
-                idx = 240 - speed;
+        if (idx < bound_idx) {
+            if (bound_idx + TILE_HEIGHT < 0) {
+                bound_idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT;
+                idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - speed;
             }
-            draw_one_line( limit_idx, tile_idx );
-            copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
+            draw_one_line( bound_idx - TILE_HEIGHT, tile_idx );
             tile_idx ^= 1;
+            if (bound_idx + SCREEN_HEIGHT + TILE_HEIGHT < MAX_SCREEN_HEIGHT) {
+                copy_vram_to_vram( _vram + (bound_idx + SCREEN_HEIGHT)*SCREEN_WIDTH/4, _vram + (bound_idx - TILE_HEIGHT)*SCREEN_WIDTH/4, SCREEN_WIDTH, TILE_HEIGHT );
+            }
+            bound_idx -= TILE_HEIGHT;
         }
 
         wait_vsync();
 
-        set_start_addr(idx * 320/4);
-
-        // delay(10);
+        set_start_addr(SCREEN_WIDTH/4 * idx);
     }
 
     set_screen_mode(0x03);

@@ -124,13 +124,13 @@ void main()
     free(pal);
 
     char *buf = load_file("ep1_01.img");
-    send_image_to_vram(_vram, 0, buf, 320, 200);
-    send_image_to_vram(_vram + 320/4, 0, buf, 320, 200);
+    send_image_to_vram(_vram, 0, buf+4, 320, 200);
+    send_image_to_vram(_vram + 320/4, 0, buf+4, 320, 200);
     free(buf);
 
     buf = load_file("ep1_02.img");
-    send_image_to_vram(_vram + 0x3E80*2, 0, buf, 320, 200);
-    send_image_to_vram(_vram + 0x3E80*2 + 320/4, 0, buf, 320, 200);
+    send_image_to_vram(_vram + 0x3E80*2, 0, buf+4, 320, 200);
+    send_image_to_vram(_vram + 0x3E80*2 + 320/4, 0, buf+4, 320, 200);
     free(buf);
 
     int ch = 0;
