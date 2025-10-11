@@ -7,7 +7,7 @@
 #include "vga_reg.h"
 
 
-//#define LINES_240
+// #define LINES_240
 
 #define SCREEN_WIDTH    320
 #ifdef LINES_240
@@ -45,6 +45,7 @@ void turn_off_chain4()
 void set_crtc_to_240_lines() {
     outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
     outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
+    _vheight = 240;
 }
 
 void set_bank_mask(int mask)

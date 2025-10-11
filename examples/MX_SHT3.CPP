@@ -7,8 +7,14 @@
 #include "vga_reg.h"
 
 
-#define SCREEN_WIDTH    320
-#define SCREEN_HEIGHT   200
+// #define LINES_240
+
+#define SCREEN_WIDTH    (320)
+#ifdef LINES_240
+#define SCREEN_HEIGHT   (240)
+#else
+#define SCREEN_HEIGHT   (200)
+#endif
 
 char* _vram = (char*)0xA0000000;
 char* _asset_vram = (char*)0xA0000000 + 0xB000;
@@ -39,6 +45,7 @@ void turn_off_chain4()
 void set_crtc_to_240_lines() {
     outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
     outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
+    _vheight = 240;
 }
 
 void set_bank_mask(int mask)
@@ -219,12 +226,14 @@ void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, in
 }
 
 
-#define TILE_W  40
-#define TILE_H  40
-#define MAP_W  (SCREEN_WIDTH/TILE_W)
-#define MAP_H  (2096/TILE_H)
+#define TILE_WIDTH  (40)
+#define TILE_HEIGHT (40)
+#define MAX_SCREEN_HEIGHT  (SCREEN_HEIGHT * 2 + TILE_HEIGHT)
 
-char map_data[MAP_W * MAP_H] = {
+#define MAP_WIDTH   (SCREEN_WIDTH / TILE_WIDTH)
+#define MAP_HEIGHT  (2096 / TILE_HEIGHT)
+
+char map_data[MAP_WIDTH * MAP_HEIGHT] = {
     0,1,0,1,0,1,0,1,
     1,0,1,0,1,0,1,0,
     0,1,0,1,0,1,0,1,
@@ -304,14 +313,11 @@ void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
 
 void draw_one_line(int line_y, int map_y)
 {
-    char *vdes = _vram + line_y * TILE_W * _vwidth;
-
-    for(int x = 0; x < 320/TILE_W; x++) {
-        put_vram_to_vram( _vram, x * TILE_W, line_y, _asset_vram + map_data[(long)map_y * 8 + x] * TILE_W/4 , TILE_W, TILE_H );
+    for(int x = 0; x < 320/TILE_WIDTH; x++) {
+        put_vram_to_vram( _vram, x * TILE_WIDTH, line_y, _asset_vram + map_data[(long)map_y * 8 + x] * TILE_WIDTH/4 , TILE_WIDTH, TILE_HEIGHT );
     }
 }
 
-// #define LINES_240
 
 void main()
 {
@@ -320,9 +326,6 @@ void main()
 
     #ifdef LINES_240
     set_crtc_to_240_lines();
-    int screen_height = 240;
-    #else
-    int screen_height = 200;
     #endif
 
     char *pal = load_file("tile.pal");
@@ -332,35 +335,35 @@ void main()
     }
     char *buf = load_file("tile.img");
     if (buf != NULL) {
-        send_image_to_vram(_asset_vram, 0, buf+4, TILE_W*2, TILE_H);
+        send_image_to_vram(_asset_vram, 0, buf+4, TILE_WIDTH*2, TILE_HEIGHT);
         free(buf);
     }
 
     buf = load_file("rap_00.img");
     unsigned char *msk;
     if (buf != NULL) {
-        send_image_to_vram(_asset_vram + TILE_W * _vwidth, 0, buf, 32, 32);
+        send_image_to_vram(_asset_vram + TILE_WIDTH * _vwidth, 0, buf, 32, 32);
         msk = make_image_mask(buf, 32, 32, 0xFF, 0);
         free(buf);
     }
 
-    int map_y = MAP_H - 1;
-    for(int i = screen_height - TILE_H; i >= 0; i -= TILE_H) {
+    int map_y = MAP_HEIGHT - 1;
+    for(int i = _vheight - TILE_HEIGHT; i >= 0; i -= TILE_HEIGHT) {
         draw_one_line( SCREEN_HEIGHT + i, map_y );
         map_y--;
     }
 
-    int offs = 320/4*200;
-    set_start_addr(320/4*200);
+    long idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - TILE_HEIGHT;
 
-    int char_x = 160;
-    int char_y = 100;
+    set_start_addr(SCREEN_WIDTH/4 * idx);
+
+    long bound_idx = idx;
+    int speed = 1;
+
+    int char_x = (SCREEN_WIDTH - 32) / 2;
+    int char_y = (SCREEN_HEIGHT - 32) / 2;;
     int new_char_x = char_x;
     int new_char_y = char_y;
-
-    long idx = 200;
-    long limit_idx = 200;
-    int speed = 1;
 
     int status = 0;
     while (status != 2) {
@@ -383,7 +386,7 @@ void main()
                     new_char_y = (char_y > 0) ? char_y - 4 : char_y - 0;
                     break;
                 case 0x50: // down
-                    new_char_y = (char_y < screen_height - 32) ? char_y + 4 : char_y + 0;
+                    new_char_y = (char_y < _vheight - 32) ? char_y + 4 : char_y + 0;
                     break;
                 case '+':
                     if(speed < 8) speed++;
@@ -400,39 +403,39 @@ void main()
         }
 
         int new_idx = idx - speed;
-        if (new_idx < limit_idx) {
+        if (new_idx < bound_idx) {
             if (map_y <= 0) {
                 status = 2;
             }
-            limit_idx -= 40;
-            if (limit_idx < 0) {
-                limit_idx = 240 - 40;
-                new_idx = 240 - speed;
+            bound_idx -= TILE_HEIGHT;
+            if (bound_idx < 0) {
+                bound_idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - TILE_HEIGHT;
+                new_idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - speed;
             }
-            draw_one_line( limit_idx, map_y );
+            draw_one_line( bound_idx, map_y );
             map_y--;
-            copy_vram_to_vram( _vram + (limit_idx + 240) * 320/4, _vram + limit_idx * 320/4, 320, 40 );
+            copy_vram_to_vram( _vram + (bound_idx + MAX_SCREEN_HEIGHT - SCREEN_HEIGHT) * SCREEN_WIDTH/4, _vram + bound_idx * SCREEN_WIDTH/4, SCREEN_WIDTH, TILE_HEIGHT );
         }
 
         wait_vsync();
         
-        long blk_x1 = char_x / 40;
-        long blk_y1 = (idx + char_y) / 40;
-        long blk_x2 = (char_x + 32 - 1) / 40;
-        long blk_y2 = (idx + char_y + 32 - 1) / 40;
+        int blk_x1 = char_x / TILE_WIDTH;
+        int blk_y1 = (idx + char_y) / TILE_HEIGHT;
+        int blk_x2 = (char_x + 32 - 1) / TILE_WIDTH;
+        int blk_y2 = (idx + char_y + 32 - 1) / TILE_HEIGHT;
         for(int by = blk_y1; by <= blk_y2; by++) {
             for(int bx = blk_x1; bx <= blk_x2; bx++) {
-                int tile = map_data[(long)by * (320/40) + bx];
-                put_vram_to_vram( _vram, bx * 40, by * 40, _asset_vram + tile * 40/4 , 40, 40 );
+                int tile = map_data[(long)by * (SCREEN_WIDTH / TILE_WIDTH) + bx];
+                put_vram_to_vram( _vram, bx * TILE_WIDTH, by * TILE_HEIGHT, _asset_vram + tile * TILE_WIDTH/4 , TILE_WIDTH, TILE_HEIGHT );
             }
         }
 
         char_x = new_char_x;
         char_y = new_char_y;
-        put_sprite_vram_to_vram(_vram + idx * 320/4, char_x, char_y, _asset_vram + 40 * _vwidth, 32, 32, msk);
+        put_sprite_vram_to_vram(_vram + idx * SCREEN_WIDTH/4, char_x, char_y, _asset_vram + TILE_WIDTH * _vwidth, 32, 32, msk);
 
         idx = new_idx;
-        set_start_addr(idx * 320/4);
+        set_start_addr(idx * SCREEN_WIDTH/4);
     }
 
     set_screen_mode(0x03);
