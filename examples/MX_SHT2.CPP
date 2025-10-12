@@ -13,7 +13,7 @@
 char* _vram = (char*)0xA0000000;
 char* _asset_vram = (char*)0xA0000000 + 0xB000;
 int _vwidth = SCREEN_WIDTH / 4;
-int _vheight = SCREEN_HEIGHT;
+int _vhei`ght = SCREEN_HEIGHT;
 
 
 void set_screen_mode(int mode)
@@ -46,6 +46,7 @@ void set_virtual_width(int width)
 void set_crtc_to_240_lines() {
     outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
     outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
+    _vheight = 240;
 }
 
 void set_bank_mask(int mask)

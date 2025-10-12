@@ -49,8 +49,10 @@ void write_pic_file(FILE* fp, FILE* outfp)
     PCXHEAD hdr;
     fread(&hdr, 128, 1, fp);
 
-    fwrite(&hdr.XEnd, sizeof(WORD), 1, outfp);
-    fwrite(&hdr.YEnd, sizeof(WORD), 1, outfp);
+    WORD width = hdr.XEnd - hdr.XStart + 1;
+    WORD height = hdr.YEnd - hdr.YStart + 1;
+    fwrite(&width, sizeof(WORD), 1, outfp);
+    fwrite(&height, sizeof(WORD), 1, outfp);
 
     long len = filelength(fileno(fp));
     len -= 128 + 1 + 768; // 128(헤더) + 1 + 768(팔레트)
