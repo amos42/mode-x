@@ -33,8 +33,8 @@ void set_screen_mode(int mode)
 void turn_off_chain4()
 {
     outportb(SA_INDEX, SA_MEMORY_MODE);
-    // outportb(SA_DATA, inportb(SA_DATA) & ~8);
-    outportb(SA_DATA, 0x06);
+    outportb(SA_DATA, inportb(SA_DATA) & ~8);
+    // outportb(SA_DATA, 0x06);
 
     outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
     outportb(CRTC_DATA, 0x00);
@@ -66,6 +66,12 @@ void select_bank(int bank)
     set_bank_mask(1 << bank);
 }
 
+void set_write_mode(int mode)
+{
+    outportb(GC_INDEX, GC_MODE);
+    outportb(GC_DATA, inportb(GC_DATA) & 0xFC | mode);
+}
+
 void set_palette_multi(unsigned char* pal, int start, int count)
 {
     outportb(DAC_INDEX, start);
@@ -79,6 +85,7 @@ void set_palette_multi(unsigned char* pal, int start, int count)
 // VRAM 상의 특정 위치에 bar를 그린다.
 void draw_bar_to_vram( char *vdes, int offs, int width, int height, char color )
 {
+    set_write_mode(0);
     int wloop = width / 4;
     for (int k = 0; k < 4; k++) {
         select_bank((offs + k) % 4);
@@ -99,9 +106,9 @@ void send_data_to_vram( char *vdes, int offs, char* img, int size )
     for (int k = 0; k < 4; k++) {
         select_bank((offs + k) % 4);
 
-        char* des = vdes;
+        char *des = vdes;
         char *src = img + k;
-        for (int i = 0; i < size; i++) {
+        for (int i = 0; i < size/4; i++) {
             *des++ = *src;
             src += 4;
         }
@@ -115,7 +122,7 @@ void send_image_to_vram( char *vdes, int offs, char* img, int width, int height 
     for (int k = 0; k < 4; k++) {
         select_bank((offs + k) % 4);
 
-        char* des = vdes;
+        char *des = vdes;
         char *src = img + k;
         for (int i = 0; i < height; i++) {
             for (int j = 0; j < wloop; j ++) {
@@ -125,12 +132,6 @@ void send_image_to_vram( char *vdes, int offs, char* img, int width, int height 
             des += _vwidth - wloop;
         }
     }
-}
-
-void set_write_mode(int mode)
-{
-    outportb(GC_INDEX, GC_MODE);
-    outportb(GC_DATA, inportb(GC_DATA) & 0xFC | mode);
 }
 
 // VRAM에서 VRAM으로 이미지를 복사한다
@@ -248,9 +249,12 @@ void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, in
 }
 
 
-#define MAX_TILE_WIDTH  (40)
-#define MAX_TILE_HEIGHT (40)
-#define MAX_SCREEN_WIDTH  (SCREEN_WIDTH * 2 + MAX_TILE_WIDTH)
+// #define MAX_TILE_WIDTH  (40)
+// #define MAX_TILE_HEIGHT (40)
+#define MAX_TILE_WIDTH  (8)
+#define MAX_TILE_HEIGHT (8)
+#define MAX_SCROLL_TICK_SIZE (16)
+// #define MAX_SCREEN_WIDTH  (SCREEN_WIDTH * 2 + MAX_TILE_WIDTH)
 
 
 #define TILE_WIDTH  (40)
@@ -260,16 +264,20 @@ void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, in
 
 int _tile_width = TILE_WIDTH;
 int _tile_height = TILE_HEIGHT;
-int _tile_width_count = 2;
-int _tile_full_tile_line = _vwidth*TILE_HEIGHT;
+int _tile_count = 0;
+// int _tile_width_count = 2;
+// int _tile_full_tile_line = _vwidth*TILE_HEIGHT;
 int _map_width = MAP_WIDTH;
 int _map_height = MAP_HEIGHT;
 
 unsigned short *_map_data = NULL;
 
-int get_image_offs_from_map(int idx)
+unsigned int get_image_offs_from_map(unsigned int idx)
 {
-    return (idx / _tile_width_count) * _tile_full_tile_line + (idx % _tile_width_count) * _tile_width / 4;
+    // int xidx = idx % _tile_width_count;
+    // int yidx = idx / _tile_width_count;
+    // return yidx * _tile_full_tile_line + xidx * _tile_width / 4;
+    return idx * _tile_width / 4 * _tile_height;
 }
 
 void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
@@ -295,20 +303,135 @@ void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
     }
 }
 
-void draw_one_vert_line(int line_x, int map_x)
+// VRAM에서 VRAM으로 이미지를 복사한다
+void copy_vram_to_vram2( char *vdes, char *vsrc, int width, int height )
 {
-    for (int y = 0; y < _map_height; y++) {
-        int tile = _map_data[y * _map_width + map_x];
-        put_vram_to_vram( _vram, line_x, y * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
+    set_write_mode(1);
+    set_bank_mask(0xF);
+
+    int wloop = width / 4;
+    int skip = _vwidth - wloop;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < wloop; j++) {
+            volatile register char dummy = *vsrc++;
+            *vdes++ = 0x00; // 아무 값이나 쓴다.
+        }
+        //vsrc += skip;
+        vdes += skip;
     }
 }
 
+void put_vram_to_vram2( char *vram, int x, int y, char *vsrc, int width, int height )
+{
+    char *vdes = vram + y * _vwidth + x / 4;
+    copy_vram_to_vram2( vdes, vsrc, width, height );
+}
+
+
+void draw_one_vert_line(char *vram, int line_x, int map_x)
+{
+    int idx = map_x;
+    for (int y = 0; y < _map_height; y++) {
+        unsigned int tile = _map_data[y*_map_width + map_x];
+        put_vram_to_vram2( vram, line_x, y * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
+        idx += _map_width;
+    }
+}
+
+void clear_bg_mask(unsigned long* bg_mask)
+{
+    for(int i = 0; i < SCREEN_WIDTH/_tile_width; i ++) {
+        bg_mask[i] = 0x0;
+    }
+}
+
+void do_bg_masking(int sx, int sy, int ex, int ey, unsigned long* bg_mask)
+{
+    for (int i = sx/_tile_width; i <= ex/_tile_width; i ++) {
+        unsigned long mask = bg_mask[i];
+        for(int j = sy/_tile_height; j <= ey/_tile_height; j++) {
+            mask |= (long)1 << j;
+        }
+        bg_mask[i] = mask;
+    }
+}
+
+void recover_bg_area_with_bg_mask(int start_map_x, int start_pos, unsigned long* bg_mask)
+{
+    // static int cl = 1;        
+    for(int i = 0; i < SCREEN_WIDTH/_tile_width; i ++) {
+        unsigned long mask = bg_mask[i];
+        if (mask == 0x0) continue;
+
+        long map_idx = start_map_x + i;
+        for(int j = 0; j < SCREEN_HEIGHT/_tile_height; j ++) {
+            if (mask & 1) {
+                unsigned int tile = _map_data[j*_map_width + map_idx];
+                put_vram_to_vram2( _vram, start_pos + i * _tile_width, j * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
+                // draw_bar_to_vram( _vram + scroll_idx / 4 + i * _tile_width / 4 + j * _tile_height * _vwidth, 0, _tile_width, _tile_height, cl );
+            }
+            mask >>= 1;
+        }
+        bg_mask[i] = 0x0;
+    }
+    // cl = cl++ % 32;
+}
+
+
+void load_map(char *map_filename)
+{
+    unsigned char *buf = load_file(map_filename);
+    if (buf == NULL) return;
+
+    _map_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+    _map_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
+    _map_data = (unsigned short *)malloc(_map_width * _map_height * sizeof(short));
+    memcpy(_map_data, buf+8, _map_width * _map_height * sizeof(short));
+    free(buf);
+}
+
+void load_tile(char *tile_filename, char *vram)
+{
+    unsigned char *buf = load_file(tile_filename);
+    if (buf == NULL) return;
+    _tile_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+    _tile_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
+    _tile_count = (unsigned)buf[8] | ((unsigned)buf[9] << 8);
+    send_data_to_vram(vram, 0, buf + 16, _tile_width * _tile_height * _tile_count);
+    free(buf);
+}
+
+void load_tile_from_image(char *tile_img_filename, int tile_width, int tile_height, char *vram)
+{
+    unsigned char *buf = load_file(tile_img_filename);
+    if (buf == NULL) return;
+
+    int width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+    int height = (unsigned)buf[2] | ((unsigned)buf[3] << 8);
+
+    unsigned char *buf2 = buf + 4;
+    unsigned char *vram2 = (unsigned char *)vram;
+    for(int i = 0; i < height; i += tile_height) {
+        for(int j = 0; j < width; j += tile_width) {
+            for (int k = 0; k < tile_height; k++) {
+                send_data_to_vram(vram2, 0, buf2 + k * width, tile_width);
+                vram2 += tile_width / 4;
+            }
+            buf2 += tile_width;
+        }
+        buf2 += width * (tile_height - 1);
+    }
+    free(buf);
+
+    _tile_width = tile_width;
+    _tile_height = tile_height;
+    _tile_count = (width / _tile_width) * (height / _tile_height);
+}
 
 void main()
 {
     set_screen_mode(0x13);
     turn_off_chain4();
-    set_virtual_width(MAX_SCREEN_WIDTH);
 
     #ifdef LINES_240
     set_crtc_to_240_lines();
@@ -319,55 +442,46 @@ void main()
         set_palette_multi((unsigned char *)pal, 0, 256);
         free(pal);
     }
-
-    unsigned char *buf = load_file("son_til.img");
-    if (buf != NULL) {
-        int width = buf[0] | (buf[1] << 8);
-        int height = buf[2] | (buf[3] << 8);
-        send_image_to_vram(_asset_vram, 0, buf+4, width, height);
-        free(buf);
-        _tile_width = 8;
-        _tile_height = 8;
-        _tile_full_tile_line = _vwidth * _tile_height;
-        _tile_width_count = width / _tile_width;
+    pal = load_file("sonic.pal");
+    if (pal != NULL) {
+        set_palette_multi((unsigned char *)pal + 128*3, 128, 256-128);
+        free(pal);
     }
 
-    buf = load_file("son_map.map");
-    if (buf != NULL) {
-        _map_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
-        _map_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
-        _map_data = (unsigned short *)malloc(_map_width * _map_height * sizeof(short));
-        memcpy(_map_data, buf+8, _map_width * _map_height * sizeof(short));
-        free(buf);
-    }
+    // load_tile("son_tile.til", _asset_vram);
+    load_tile_from_image("son_til.img", 8, 8, _asset_vram);
+    load_map("son_map.map");
 
-    buf = load_file("rap_00.img");
+    set_virtual_width(SCREEN_WIDTH * 2 + _tile_width);
+
+    char *buf = load_file("sonic.img");
     unsigned char *msk;
     if (buf != NULL) {
-        send_image_to_vram(_asset_vram + 300, 0, buf, 32, 32);
-        msk = make_image_mask(buf, 32, 32, 0xFF, 0);
+        send_image_to_vram(_asset_vram + 20000/4, 0, buf+4, 48, 24);
+        msk = make_image_mask(buf+4, 48, 24, 0xFF, 0);
         free(buf);
     }
 
-    int map_x = 0;
-    for(int i = 0; i < SCREEN_WIDTH; i += _tile_height) {
-        draw_one_vert_line( i, map_x );
-        map_x++;
+    int start_pos = 0;
+    int next_pos = start_pos + _tile_width;
+    int start_map_x = 0;    
+    
+    for(int i = 0; i < SCREEN_WIDTH/_tile_width + 1; i++) {
+        draw_one_vert_line( _vram, start_pos + i * _tile_width, start_map_x + i );
     }
+    long scroll_pos = 0;
 
-    long idx = 0;
+    int speed = 4;
 
-    // set_start_addr(idx);
-
-    long bound_idx = idx + SCREEN_WIDTH;
-    int speed = 1;
-
-    int char_x = (SCREEN_WIDTH - 32) / 2;
-    int char_y = (SCREEN_HEIGHT - 32) / 2;;
+    int char_x = 80;
+    int char_y = 120;
     int new_char_x = char_x;
     int new_char_y = char_y;
 
-    int status = 0;
+    unsigned long bg_mask[320/8] = {0, };
+
+    int status = 1;
+    int new_block = 0;
     int rewind = 0;
     while (status != 2) {
         if ( kbhit() ){
@@ -392,10 +506,10 @@ void main()
                     new_char_y = (char_y < SCREEN_HEIGHT - 32) ? char_y + 4 : char_y + 0;
                     break;
                 case '+':
-                    if(speed < 8) speed++;
+                    if(speed < MAX_SCROLL_TICK_SIZE) speed+=4;
                     break;
                 case '-':
-                    if(speed > 1) speed--;
+                    if(speed > 4) speed-=4;
                     break;
             }
         } 
@@ -405,46 +519,66 @@ void main()
             continue;
         }
 
-        int new_idx = idx + speed;
-        if (new_idx + SCREEN_WIDTH > bound_idx) {
-            if (map_x >= _map_width - SCREEN_WIDTH / _tile_width - 1) {
+        scroll_pos += speed;
+
+        // wait_vsync();
+
+        if (scroll_pos >= next_pos) {
+            if (start_map_x + SCREEN_WIDTH / _tile_width >= _map_width - 1) {
                 status = 2;
+                continue;
             }
-            if (bound_idx >= MAX_SCREEN_WIDTH) {
-                bound_idx = 0 + SCREEN_WIDTH;
-                new_idx = 0 + speed;
+
+            if (next_pos + SCREEN_WIDTH >= (SCREEN_WIDTH * 2 + _tile_width)) {
+                start_pos = 0;
+                scroll_pos = 0;
                 rewind = 1;
+            } else {
+                start_pos += _tile_width;
             }
-            draw_one_vert_line( bound_idx, map_x );
-            map_x++;
-            if (bound_idx - SCREEN_WIDTH - _tile_width >= 0) {
-                copy_vram_to_vram( _vram + (bound_idx - _tile_width - SCREEN_WIDTH)/4, _vram + (bound_idx)/4, _tile_width, SCREEN_HEIGHT );
-            }
-            bound_idx += _tile_width;
+
+            new_block = 1;
         }
 
+        if (new_block) {
+            // start_pos += _tile_width;
+            next_pos = start_pos + _tile_width;
+
+            start_map_x++;
+            draw_one_vert_line( _vram, start_pos + SCREEN_WIDTH, start_map_x + (SCREEN_WIDTH / _tile_width) );
+            // if (start_pos >= _tile_width) {
+            //    copy_vram_to_vram( _vram + (start_pos - _tile_width)/4, _vram + (start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
+            // }
+            // new_block = 0;
+        }
+
+        set_start_addr(scroll_pos / 4);
         wait_vsync();
-        if (!rewind) {
-            int blk_x1 = (idx + char_x) / _tile_width;
-            int blk_y1 = (char_y) / _tile_height;
-            int blk_x2 = (idx + char_x + 32 - 1) / _tile_width;
-            int blk_y2 = (char_y + 32 - 1) / _tile_height;
-            for(int by = blk_y1; by <= blk_y2; by++) {
-                for(int bx = blk_x1; bx <= blk_x2; bx++) {
-                    int tile = _map_data[(long)bx * _map_height + by];
-                    put_vram_to_vram( _vram, bx * _tile_width, by * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
-                }
+        wait_vsync();
+
+         if (new_block) {
+            // start_pos += _tile_width;
+            // next_pos = start_pos + _tile_width;
+
+            // start_map_x++;
+            // draw_one_vert_line( _vram, start_pos + SCREEN_WIDTH, start_map_x + (SCREEN_WIDTH / _tile_width) );
+            if (start_pos >= _tile_width) {
+               copy_vram_to_vram( _vram + (start_pos - _tile_width)/4, _vram + (start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
             }
+            new_block = 0;
+        }
+
+        if (!rewind) {
+            recover_bg_area_with_bg_mask(start_map_x, start_pos, bg_mask);
         } else {
+            clear_bg_mask(bg_mask);
             rewind = 0;
         }
 
         char_x = new_char_x;
         char_y = new_char_y;
-        put_sprite_vram_to_vram(_vram + idx / 4, char_x, char_y, _asset_vram + 300, 32, 32, msk);
-
-        idx = new_idx;
-        set_start_addr(idx / 4);
+        put_sprite_vram_to_vram(_vram + scroll_pos / 4, char_x, char_y, _asset_vram + 20000/4, 48, 24, msk);
+        do_bg_masking(char_x, char_y, char_x+48-1, char_y+24-1, bg_mask);
     }
 
     if (msk) free(msk);
