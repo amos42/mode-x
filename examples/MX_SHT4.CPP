@@ -480,7 +480,7 @@ void main()
 
     unsigned long bg_mask[320/8] = {0, };
 
-    int status = 1;
+    int status = 0;
     int new_block = 0;
     int rewind = 0;
     while (status != 2) {
@@ -554,9 +554,8 @@ void main()
 
         set_start_addr(scroll_pos / 4);
         wait_vsync();
-        wait_vsync();
 
-         if (new_block) {
+        if (new_block) {
             // start_pos += _tile_width;
             // next_pos = start_pos + _tile_width;
 
