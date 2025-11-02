@@ -169,8 +169,8 @@ void set_start_addr(unsigned int start_offs)
 
 void wait_vsync()
 {
-    // while ((inportb(0x3DA) & 8) != 0);
     // while ((inportb(0x3DA) & 8) == 0);
+    // while ((inportb(0x3DA) & 8) != 0);
 
     asm  mov    dx, 0x3DA
     wait_vsync_off:
@@ -358,7 +358,6 @@ void do_bg_masking(int sx, int sy, int ex, int ey, unsigned long* bg_mask)
 
 void recover_bg_area_with_bg_mask(int start_map_x, int start_pos, unsigned long* bg_mask)
 {
-    // static int cl = 1;        
     for(int i = 0; i < SCREEN_WIDTH/_tile_width; i ++) {
         unsigned long mask = bg_mask[i];
         if (mask == 0x0) continue;
@@ -368,13 +367,17 @@ void recover_bg_area_with_bg_mask(int start_map_x, int start_pos, unsigned long*
             if (mask & 1) {
                 unsigned int tile = _map_data[j*_map_width + map_idx];
                 put_vram_to_vram2( _vram, start_pos + i * _tile_width, j * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
-                // draw_bar_to_vram( _vram + scroll_idx / 4 + i * _tile_width / 4 + j * _tile_height * _vwidth, 0, _tile_width, _tile_height, cl );
             }
             mask >>= 1;
         }
         bg_mask[i] = 0x0;
     }
-    // cl = cl++ % 32;
+}
+
+void draw_char(int start_pos, int x, int y, int width, int height, char *vram, unsigned char *img_mask, unsigned long *bg_mask)
+{
+    put_sprite_vram_to_vram(_vram + start_pos/4, x, y, vram, width, height, img_mask);
+    do_bg_masking(x, y, x+width-1, y+height-1, bg_mask);
 }
 
 
@@ -390,15 +393,17 @@ void load_map(char *map_filename)
     free(buf);
 }
 
-void load_tile(char *tile_filename, char *vram)
+int load_tile(char *tile_filename, char *vram)
 {
     unsigned char *buf = load_file(tile_filename);
-    if (buf == NULL) return;
+    if (buf == NULL) return 0;
     _tile_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
     _tile_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
     _tile_count = (unsigned)buf[8] | ((unsigned)buf[9] << 8);
     send_data_to_vram(vram, 0, buf + 16, _tile_width * _tile_height * _tile_count);
     free(buf);
+
+    return _tile_width * _tile_height * _tile_count;
 }
 
 void load_tile_from_image(char *tile_img_filename, int tile_width, int tile_height, char *vram)
@@ -448,11 +453,11 @@ void main()
         free(pal);
     }
 
-    // load_tile("son_tile.til", _asset_vram);
-    load_tile_from_image("son_til.img", 8, 8, _asset_vram);
+    load_tile("son_tile.til", _asset_vram);
+    // load_tile_from_image("son_til.img", 8, 8, _asset_vram);
     load_map("son_map.map");
 
-    set_virtual_width(SCREEN_WIDTH * 2 + _tile_width);
+    set_virtual_width(SCREEN_WIDTH * 2 + _tile_width * 2);
 
     char *buf = load_file("sonic.img");
     unsigned char *msk;
@@ -471,17 +476,15 @@ void main()
     }
     long scroll_pos = 0;
 
-    int speed = 4;
+    int scroll_speed = 4;
+    int char_fling_speed = 4;
 
     int char_x = 80;
     int char_y = 120;
-    int new_char_x = char_x;
-    int new_char_y = char_y;
 
     unsigned long bg_mask[320/8] = {0, };
 
     int status = 0;
-    int new_block = 0;
     int rewind = 0;
     while (status != 2) {
         if ( kbhit() ){
@@ -494,78 +497,62 @@ void main()
                     status = 2;
                     break;
                 case 0x4B: // left
-                    new_char_x = (char_x > 0) ? char_x - 4 : char_x - 0;
+                    char_x = (char_x > 0) ? char_x - 4 : char_x;
                     break;
                 case 0x4D: // right
-                    new_char_x = (char_x < SCREEN_WIDTH - 32) ? char_x + 4 : char_x +0;
+                    char_x = (char_x < SCREEN_WIDTH - 32) ? char_x + 4 : char_x;
                     break;
                 case 0x48: // up
-                    new_char_y = (char_y > 0) ? char_y - 4 : char_y - 0;
+                    char_y = (char_y > 0) ? char_y - 4 : char_y - 0;
                     break;
                 case 0x50: // down
-                    new_char_y = (char_y < SCREEN_HEIGHT - 32) ? char_y + 4 : char_y + 0;
+                    char_y = (char_y < SCREEN_HEIGHT - 32) ? char_y + 4 : char_y + 0;
                     break;
                 case '+':
-                    if(speed < MAX_SCROLL_TICK_SIZE) speed+=4;
+                    if(scroll_speed < MAX_SCROLL_TICK_SIZE) scroll_speed+=4;
                     break;
                 case '-':
-                    if(speed > 4) speed-=4;
+                    if(scroll_speed > 4) scroll_speed-=4;
                     break;
             }
-        } 
+        }
 
         if (status != 0) {
             delay(100);
             continue;
         }
 
-        scroll_pos += speed;
+        char_x += char_fling_speed;
 
-        // wait_vsync();
+        scroll_pos += scroll_speed;
 
+        int new_start_pos = start_pos;
+        int new_start_map_x = start_map_x;
         if (scroll_pos >= next_pos) {
             if (start_map_x + SCREEN_WIDTH / _tile_width >= _map_width - 1) {
                 status = 2;
                 continue;
             }
 
-            if (next_pos + SCREEN_WIDTH >= (SCREEN_WIDTH * 2 + _tile_width)) {
-                start_pos = 0;
+            if (next_pos + SCREEN_WIDTH >= (SCREEN_WIDTH * 2 + _tile_width * 2)) {
+                new_start_pos = 0;
                 scroll_pos = 0;
                 rewind = 1;
             } else {
-                start_pos += _tile_width;
+                new_start_pos += _tile_width;
             }
 
-            new_block = 1;
+            next_pos = new_start_pos + _tile_width;
+
+            new_start_map_x = start_map_x + 1;
+            draw_one_vert_line( _vram, new_start_pos + SCREEN_WIDTH, new_start_map_x + (SCREEN_WIDTH / _tile_width) );
+            if (new_start_pos >= _tile_width * 2) {
+               copy_vram_to_vram( _vram + (new_start_pos - _tile_width * 2)/4, _vram + (new_start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
+            }
         }
 
-        if (new_block) {
-            // start_pos += _tile_width;
-            next_pos = start_pos + _tile_width;
-
-            start_map_x++;
-            draw_one_vert_line( _vram, start_pos + SCREEN_WIDTH, start_map_x + (SCREEN_WIDTH / _tile_width) );
-            // if (start_pos >= _tile_width) {
-            //    copy_vram_to_vram( _vram + (start_pos - _tile_width)/4, _vram + (start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
-            // }
-            // new_block = 0;
-        }
-
-        set_start_addr(scroll_pos / 4);
         wait_vsync();
-
-        if (new_block) {
-            // start_pos += _tile_width;
-            // next_pos = start_pos + _tile_width;
-
-            // start_map_x++;
-            // draw_one_vert_line( _vram, start_pos + SCREEN_WIDTH, start_map_x + (SCREEN_WIDTH / _tile_width) );
-            if (start_pos >= _tile_width) {
-               copy_vram_to_vram( _vram + (start_pos - _tile_width)/4, _vram + (start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
-            }
-            new_block = 0;
-        }
+        // for(int i=0; i<50;i++) wait_vsync();
 
         if (!rewind) {
             recover_bg_area_with_bg_mask(start_map_x, start_pos, bg_mask);
@@ -573,11 +560,13 @@ void main()
             clear_bg_mask(bg_mask);
             rewind = 0;
         }
+        start_pos = new_start_pos;
+        start_map_x = new_start_map_x;
 
-        char_x = new_char_x;
-        char_y = new_char_y;
-        put_sprite_vram_to_vram(_vram + scroll_pos / 4, char_x, char_y, _asset_vram + 20000/4, 48, 24, msk);
-        do_bg_masking(char_x, char_y, char_x+48-1, char_y+24-1, bg_mask);
+        int x = char_x - start_map_x * _tile_width;
+        draw_char(start_pos, x, char_y, 48, 24, _asset_vram + 20000/4, msk, bg_mask);
+
+        set_start_addr(scroll_pos / 4);
     }
 
     if (msk) free(msk);
