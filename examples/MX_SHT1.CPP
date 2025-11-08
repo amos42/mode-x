@@ -39,7 +39,7 @@ void turn_off_chain4()
     outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
     outportb(CRTC_DATA, 0x00);
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
-    outportb(CRTC_DATA, 0xA3);
+    outportb(CRTC_DATA, 0xE3);
 }
 
 void set_crtc_to_240_lines() {

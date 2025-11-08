@@ -23,10 +23,13 @@
 #define CRTC_DATA  0x3D5
 #define   CRTC_START_ADDR_HI        0x0C
 #define   CRTC_START_ADDR_LO        0x0D
+#define   CRTC_VERTICAL_SYNC_END    0x11
 #define   CRTC_VERT_DISP_ENABLE_END 0x12
 #define   CRTC_OFFSET               0x13
 #define   CRTC_UNDERLINE_LOCATTION  0x14
 #define   CRTC_MODE_CONTROL         0x17
+
+#define MISC_OUTPUT 0x03C2
 
 
 #endif // __VGA_REG_H_

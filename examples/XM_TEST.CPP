@@ -29,10 +29,10 @@ void set_plane_mode()
     outportb(SA_INDEX, SA_MEMORY_MODE);
     outportb(SA_DATA, inportb(SA_DATA) & ~8);
 
-    // outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
-    // outportb(CRTC_DATA, 0x00);
-    // outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
-    // outportb(CRTC_DATA, 0xa3);
+    outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
+    outportb(CRTC_DATA, 0x00);
+    outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
+    outportb(CRTC_DATA, 0xE3);
 }
 
 void set_plane_mask(int plane_mask)

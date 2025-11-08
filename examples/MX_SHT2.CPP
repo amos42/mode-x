@@ -13,7 +13,7 @@
 char* _vram = (char*)0xA0000000;
 char* _asset_vram = (char*)0xA0000000 + 0xB000;
 int _vwidth = SCREEN_WIDTH / 4;
-int _vhei`ght = SCREEN_HEIGHT;
+int _vheight = SCREEN_HEIGHT;
 
 
 void set_screen_mode(int mode)
@@ -33,7 +33,7 @@ void turn_off_chain4()
     outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
     outportb(CRTC_DATA, 0x00);
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
-    outportb(CRTC_DATA, 0xA3);
+    outportb(CRTC_DATA, 0xE3);
 }
 
 void set_virtual_width(int width)

@@ -32,9 +32,59 @@ void set_crtc_to_240_lines()
 // chain-4 로직을 끈다
 void turn_off_chain4()
 {
+    // mov     dx,SC_INDEX ; 3c4h
+    // mov     ax,0604h
+    // out     dx,ax   ;disable chain4 mode
+
+    // mov     dx,SC_INDEX ; 3c4h
+    // mov     ax,0100h
+    // out     dx,ax   ;synchronous reset while setting Misc Output for safety, even though clock unchanged
+
+    // mov     dx,MISC_OUTPUT ; 3c2h
+    // mov     al,0e3h
+    // out     dx,al   ;select 25 MHz dot clock & 60 Hz scanning rate
+
+    // mov     dx,SC_INDEX
+    // mov     ax,0300h
+    // out     dx,ax   ;undo reset (restart sequencer)
+
+    // mov     dx,CRTC_INDEX ;reprogram the CRT Controller
+    // mov     al,11h  ;VSync End reg contains register write
+    // out     dx,al   ; protect bit
+
+    // inc     dx      ;CRT Controller Data register
+    // in      al,dx   ;get current VSync End register setting
+    // and     al,7fh  ;remove write protect on various
+    // out     dx,al   ; CRTC registers
+    // dec     dx      ;CRT Controller Index        
+
+    // outport(0x03c4, 0x0604);
+    // outport(0x03c4, 0x0100);
+
+    // outportb(0x03c2, 0xe3);
+
+    // outport(0x03c4, 0x0300);
+
+    // outportb(0x03d4, 0x11);
+    // outportb(0x03d5, inportb(0x03d5) & 0x7F);
+
+    // none-chain-4 모드
     outportb(SA_INDEX, SA_MEMORY_MODE);
     // outportb(SA_DATA, inportb(SA_DATA) & ~8);
     outportb(SA_DATA, 0x06);
+
+    // 스캔 주기 60Hz
+    outportb(MISC_OUTPUT, 0xE3);
+
+    // 1byte 전송 모드
+    outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
+    outportb(CRTC_DATA, 0x00);
+    outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
+    outportb(CRTC_DATA, 0xE3);
+
+    // CRTC 수직 해상도 관련 레지스터의 조작을 막는다.
+    // outportb(CRTC_INDEX, CRTC_VERTICAL_SYNC_END);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & 0x7F);
 }
 
 // 뱅크 마스크 설정
