@@ -4,7 +4,7 @@
 #include <dos.h>
 #include <mem.h>
 #include <io.h>
-#include "vga_reg.h"
+#include "../src/VGA_REG.H"
 
 
 char* _vram = (char*)0xA0000000;
@@ -84,7 +84,7 @@ void set_write_mode(int mode)
 }
 
 // VRAM에서 VRAM으로 이미지를 복사한다
-void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
+void copy_vram_image_to_vram_image( char *vdes, char *vsrc, int width, int height )
 {
     set_write_mode(1);
     set_bank_mask(0xF);
@@ -105,7 +105,7 @@ void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
 void put_vram_to_vram( char *vram, int x, int y, char *vsrc, int width, int height )
 {
     char *vdes = vram + y * _vwidth + x / 4;
-    copy_vram_to_vram( vdes, vsrc, width, height );
+    copy_vram_image_to_vram_image( vdes, vsrc, width, height );
 }
 
 char *load_file(char *filename)

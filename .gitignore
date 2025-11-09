@@ -2,4 +2,3 @@
 *.obj
 *.swp
 src/MODE_X.lib
-examples/VGA_REG.h

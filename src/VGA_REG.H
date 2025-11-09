@@ -29,7 +29,9 @@
 #define   CRTC_UNDERLINE_LOCATTION  0x14
 #define   CRTC_MODE_CONTROL         0x17
 
-#define MISC_OUTPUT 0x03C2
+#define CRTC_STATE 0x3DA
+
+#define MISC_OUTPUT 0x3C2
 
 
 #endif // __VGA_REG_H_

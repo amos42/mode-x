@@ -3,6 +3,8 @@
 #include <dos.h>
 #include <malloc.h>
 // #include "GAME13H.H"
+#include "../src/VGA_REG.H"
+
 
 #define GC_INDEX   0x3CE
 #define GC_DATA    0x3CF

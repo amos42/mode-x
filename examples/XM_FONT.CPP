@@ -6,6 +6,7 @@
 #include <dos.h>
 #include <conio.h>
 //#include <stdint.h>
+#include "../src/VGA_REG.H"
 
 #define VGA_SEQ_INDEX   0x3C4
 #define VGA_SEQ_DATA    0x3C5

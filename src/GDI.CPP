@@ -5,7 +5,8 @@
 // 사각형 그리기
 void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
 {
-    for (int i = x1; i <= x2; i++) {
+    int i;
+    for (i = x1; i <= x2; i++) {
         buf[y1 * vwidth + i] = color;
         buf[y2 * vwidth + i] = color;
     }

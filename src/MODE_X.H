@@ -30,6 +30,8 @@ void set_palette_multi(unsigned char* pal, int start, int count);
 void clear_screen( char *vram, char color );
 void send_image_to_vram( char *vdes, int offs, char* img, int width, int height );
 void put_image_to_vram( char *vram, int x, int y, char* img, int width, int height );
+void copy_vram_to_vram_image( char *vdes, char *vsrc, int width, int height );
+void put_vram_to_vram_image( char *vram, int x, int y, char *vsrc, int width, int height );
 
 char* make_shift_image(char* img, int width, int height, int* new_width, int* new_height);
 void put_sprite_to_vram( char *vram, int x, int y, char* img, int width, int height, unsigned char* mask );

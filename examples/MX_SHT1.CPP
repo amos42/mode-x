@@ -4,7 +4,7 @@
 #include <dos.h>
 #include <mem.h>
 #include <io.h>
-#include "vga_reg.h"
+#include "../src/VGA_REG.H"
 
 
 // #define LINES_240
@@ -115,7 +115,7 @@ void set_write_mode(int mode)
 }
 
 // VRAM에서 VRAM으로 이미지를 복사한다
-void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
+void copy_vram_image_to_vram_image( char *vdes, char *vsrc, int width, int height )
 {
     set_write_mode(1);
     set_bank_mask(0xF);
@@ -136,7 +136,7 @@ void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
 void put_vram_to_vram( char *vram, int x, int y, char *vsrc, int width, int height )
 {
     char *vdes = vram + y * _vwidth + x / 4;
-    copy_vram_to_vram( vdes, vsrc, width, height );
+    copy_vram_image_to_vram_image( vdes, vsrc, width, height );
 }
 
 void set_start_addr(unsigned int start_offs)
@@ -241,7 +241,7 @@ void main()
             draw_one_line( bound_idx - TILE_HEIGHT, tile_idx );
             tile_idx ^= 1;
             if (bound_idx + SCREEN_HEIGHT + TILE_HEIGHT < MAX_SCREEN_HEIGHT) {
-                copy_vram_to_vram( _vram + (bound_idx + SCREEN_HEIGHT)*SCREEN_WIDTH/4, _vram + (bound_idx - TILE_HEIGHT)*SCREEN_WIDTH/4, SCREEN_WIDTH, TILE_HEIGHT );
+                copy_vram_image_to_vram_image( _vram + (bound_idx + SCREEN_HEIGHT)*SCREEN_WIDTH/4, _vram + (bound_idx - TILE_HEIGHT)*SCREEN_WIDTH/4, SCREEN_WIDTH, TILE_HEIGHT );
             }
             bound_idx -= TILE_HEIGHT;
         }

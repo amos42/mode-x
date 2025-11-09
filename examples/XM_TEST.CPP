@@ -3,6 +3,7 @@
 #include <dos.h>
 #include <malloc.h>
 // #include "GAME13H.H"
+#include "../src/VGA_REG.H"
 
 
 char* vram = (char*)0xA0000000;

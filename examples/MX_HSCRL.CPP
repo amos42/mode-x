@@ -4,7 +4,8 @@
 #include <dos.h>
 #include <mem.h>
 #include <io.h>
-#include "vga_reg.h"
+#include "../src/VGA_REG.H"
+
 
 char* _vram = (char*)0xA0000000;
 int _vwidth = 320 / 4;

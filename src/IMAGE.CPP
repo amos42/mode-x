@@ -30,7 +30,7 @@ void put_image_to_vram( char *vram, int x, int y, char* img, int width, int heig
 }
 
 // VRAM에서 VRAM으로 이미지를 복사한다
-void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
+void copy_vram_image_to_vram_image( char *vdes, char *vsrc, int width, int height )
 {
     set_write_mode(1);
     set_bank_mask(0xF);
@@ -51,5 +51,27 @@ void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
 void put_vram_to_vram( char *vram, char *vsrc, int x, int y, char* img, int width, int height )
 {
     char *vdes = vram + y * _vwidth + x / 4;
-    copy_vram_to_vram( vdes, vsrc, width, height );
+    copy_vram_image_to_vram_image( vdes, vsrc, width, height );
+}
+
+void copy_vram_to_vram_image( char *vdes, char *vsrc, int width, int height )
+{
+    set_write_mode(1);
+    set_bank_mask(0xF);
+
+    int wloop = width / 4;
+    int skip = _vwidth - wloop;
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < wloop; j++) {
+            volatile register char dummy = *vsrc++;
+            *vdes++ = 0x00; // 아무 값이나 쓴다.
+        }
+        vdes += skip;
+    }
+}
+
+void put_vram_to_vram_image( char *vram, int x, int y, char *vsrc, int width, int height )
+{
+    char *vdes = vram + y * _vwidth + x / 4;
+    copy_vram_to_vram_image( vdes, vsrc, width, height );
 }

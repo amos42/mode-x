@@ -8,6 +8,7 @@
 //#include <stdint.h>
 #include <stdio.h>
 #include <malloc.h>
+#include "../src/VGA_REG.H"
 
 
 #define VGA_SEQ_INDEX   0x3C4

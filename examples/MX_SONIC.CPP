@@ -4,7 +4,7 @@
 #include <dos.h>
 #include <mem.h>
 #include <io.h>
-#include "vga_reg.h"
+#include "../src/VGA_REG.H"
 
 
 // #define LINES_240
@@ -32,31 +32,33 @@ void set_screen_mode(int mode)
 
 void turn_off_chain4()
 {
-    // mov     dx,SC_INDEX ; 3c4h
-    // mov     ax,0604h
-    // out     dx,ax   ;disable chain4 mode
+    // asm {
+    //     mov     dx,SA_INDEX // 3c4h
+    //     mov     ax,0604h
+    //     out     dx,ax   // disable chain4 mode
 
-    // mov     dx,SC_INDEX ; 3c4h
-    // mov     ax,0100h
-    // out     dx,ax   ;synchronous reset while setting Misc Output for safety, even though clock unchanged
+    //     mov     dx,SA_INDEX // 3c4h
+    //     mov     ax,0100h
+    //     out     dx,ax   // synchronous reset while setting Misc Output for safety, even though clock unchanged
 
-    // mov     dx,MISC_OUTPUT ; 3c2h
-    // mov     al,0e3h
-    // out     dx,al   ;select 25 MHz dot clock & 60 Hz scanning rate
+    //     mov     dx,MISC_OUTPUT // 3c2h
+    //     mov     al,0e3h
+    //     out     dx,al   // select 25 MHz dot clock & 60 Hz scanning rate
 
-    // mov     dx,SC_INDEX
-    // mov     ax,0300h
-    // out     dx,ax   ;undo reset (restart sequencer)
+    //     mov     dx,SA_INDEX
+    //     mov     ax,0300h
+    //     out     dx,ax   // undo reset (restart sequencer)
 
-    // mov     dx,CRTC_INDEX ;reprogram the CRT Controller
-    // mov     al,11h  ;VSync End reg contains register write
-    // out     dx,al   ; protect bit
+    //     mov     dx,CRTC_INDEX // reprogram the CRT Controller
+    //     mov     al,11h  // VSync End reg contains register write
+    //     out     dx,al   // protect bit
 
-    // inc     dx      ;CRT Controller Data register
-    // in      al,dx   ;get current VSync End register setting
-    // and     al,7fh  ;remove write protect on various
-    // out     dx,al   ; CRTC registers
-    // dec     dx      ;CRT Controller Index        
+    //     inc     dx      // CRT Controller Data register
+    //     in      al,dx   // get current VSync End register setting
+    //     and     al,7fh  // remove write protect on various
+    //     out     dx,al   // CRTC registers
+    //     dec     dx      // CRT Controller Index        
+    // }
 
     // outport(0x03c4, 0x0604);
     // outport(0x03c4, 0x0100);
@@ -68,9 +70,10 @@ void turn_off_chain4()
     // outportb(0x03d4, 0x11);
     // outportb(0x03d5, inportb(0x03d5) & 0x7F);
 
+
     // none-chain-4 모드
     outportb(SA_INDEX, SA_MEMORY_MODE);
-    // outportb(SA_DATA, inportb(SA_DATA) & ~8);
+    // outportb(SA_DATA, inportb(SA_DATA) & ~(1 << 3));
     outportb(SA_DATA, 0x06);
 
     // 스캔 주기 60Hz
@@ -79,12 +82,14 @@ void turn_off_chain4()
     // 1byte 전송 모드
     outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
     outportb(CRTC_DATA, 0x00);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~(1 << 5) | (1 << 6));
     outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
     outportb(CRTC_DATA, 0xE3);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~((1 << 6) | (1 << 3)));
 
     // CRTC 수직 해상도 관련 레지스터의 조작을 막는다.
-    // outportb(CRTC_INDEX, CRTC_VERTICAL_SYNC_END);
-    // outportb(CRTC_DATA, inportb(CRTC_DATA) & 0x7F);
+    outportb(CRTC_INDEX, CRTC_VERTICAL_SYNC_END);
+    outportb(CRTC_DATA, inportb(CRTC_DATA) & 0x7F);
 }
 
 void set_virtual_width(int width)
@@ -180,7 +185,7 @@ void send_image_to_vram( char *vdes, int offs, char* img, int width, int height 
 }
 
 // VRAM에서 VRAM으로 이미지를 복사한다
-void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
+void copy_vram_image_to_vram_image( char *vdes, char *vsrc, int width, int height )
 {
     set_write_mode(1);
     set_bank_mask(0xF);
@@ -201,7 +206,7 @@ void copy_vram_to_vram( char *vdes, char *vsrc, int width, int height )
 void put_vram_to_vram( char *vram, int x, int y, char *vsrc, int width, int height )
 {
     char *vdes = vram + y * _vwidth + x / 4;
-    copy_vram_to_vram( vdes, vsrc, width, height );
+    copy_vram_image_to_vram_image( vdes, vsrc, width, height );
 }
 
 void set_start_addr(unsigned int start_offs)
@@ -214,20 +219,20 @@ void set_start_addr(unsigned int start_offs)
 
 void wait_vsync()
 {
-    // while ((inportb(0x3DA) & 8) == 0);
-    // while ((inportb(0x3DA) & 8) != 0);
+    // while ((inportb(CRTC_STATE) & 0x08) == 0);
+    // while ((inportb(CRTC_STATE) & 0x08) != 0);
 
-    asm  mov    dx, 0x3DA
+    asm  mov    dx, CRTC_STATE
     wait_vsync_off:
     asm {
         in      al, dx
-        test    al, 8
+        test    al, 0x08
         jnz     wait_vsync_off  // VSYNC 끝날 때까지 기다림
     }
     wait_vsync_on:
     asm {
         in      al, dx
-        test    al, 8
+        test    al, 0x08
         jz      wait_vsync_on  // VSYNC 시작될 때까지 기다림
     }
 }
@@ -293,63 +298,8 @@ void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, in
     send_sprite_vram_to_vram(des, src, width, height, mask);
 }
 
-
-// #define MAX_TILE_WIDTH  (40)
-// #define MAX_TILE_HEIGHT (40)
-#define MAX_TILE_WIDTH  (8)
-#define MAX_TILE_HEIGHT (8)
-#define MAX_SCROLL_TICK_SIZE (16)
-// #define MAX_SCREEN_WIDTH  (SCREEN_WIDTH * 2 + MAX_TILE_WIDTH)
-
-
-#define TILE_WIDTH  (40)
-#define TILE_HEIGHT (40)
-#define MAP_WIDTH   (2048 / TILE_WIDTH)
-#define MAP_HEIGHT  (SCREEN_HEIGHT / TILE_HEIGHT)
-
-int _tile_width = TILE_WIDTH;
-int _tile_height = TILE_HEIGHT;
-int _tile_count = 0;
-// int _tile_width_count = 2;
-// int _tile_full_tile_line = _vwidth*TILE_HEIGHT;
-int _map_width = MAP_WIDTH;
-int _map_height = MAP_HEIGHT;
-
-unsigned short *_map_data = NULL;
-
-unsigned int get_image_offs_from_map(unsigned int idx)
-{
-    // int xidx = idx % _tile_width_count;
-    // int yidx = idx / _tile_width_count;
-    // return yidx * _tile_full_tile_line + xidx * _tile_width / 4;
-    return idx * _tile_width / 4 * _tile_height;
-}
-
-void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
-{
-    int i, j;
-    for (i = y1; i <= y2; i++) {
-        for (j = x1; j <= x2; j++) {
-            buf[i * vwidth + j] = color;
-        }
-    }
-}
-
-void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
-{
-    int i, j;
-    for (i = x1; i <= x2; i++) {
-        buf[y1 * vwidth + i] = color;
-        buf[y2 * vwidth + i] = color;
-    }
-    for (i = y1 + 1; i < y2; i++) {
-        buf[i * vwidth + x1] = color;
-        buf[i * vwidth + x2] = color;
-    }
-}
-
 // VRAM에서 VRAM으로 이미지를 복사한다
-void copy_vram_to_vram2( char *vdes, char *vsrc, int width, int height )
+void copy_vram_to_vram_image( char *vdes, char *vsrc, int width, int height )
 {
     set_write_mode(1);
     set_bank_mask(0xF);
@@ -361,24 +311,91 @@ void copy_vram_to_vram2( char *vdes, char *vsrc, int width, int height )
             volatile register char dummy = *vsrc++;
             *vdes++ = 0x00; // 아무 값이나 쓴다.
         }
-        //vsrc += skip;
         vdes += skip;
     }
 }
 
-void put_vram_to_vram2( char *vram, int x, int y, char *vsrc, int width, int height )
+void put_vram_to_vram_image( char *vram, int x, int y, char *vsrc, int width, int height )
 {
     char *vdes = vram + y * _vwidth + x / 4;
-    copy_vram_to_vram2( vdes, vsrc, width, height );
+    copy_vram_to_vram_image( vdes, vsrc, width, height );
 }
 
+
+#define MAX_SCROLL_TICK_SIZE (16)
+
+int _tile_width = 0;
+int _tile_height = 0;
+int _tile_count = 0;
+int _map_width = 0;
+int _map_height = 0;
+
+unsigned short *_map_data = NULL;
+
+void load_map(char *map_filename)
+{
+    unsigned char *buf = load_file(map_filename);
+    if (buf == NULL) return;
+
+    _map_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+    _map_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
+    _map_data = (unsigned short *)malloc(_map_width * _map_height * sizeof(short));
+    memcpy(_map_data, buf+8, _map_width * _map_height * sizeof(short));
+    free(buf);
+}
+
+int load_tile(char *tile_filename, char *vram)
+{
+    unsigned char *buf = load_file(tile_filename);
+    if (buf == NULL) return 0;
+    _tile_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+    _tile_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
+    _tile_count = (unsigned)buf[8] | ((unsigned)buf[9] << 8);
+    send_data_to_vram(vram, 0, buf + 16, _tile_width * _tile_height * _tile_count);
+    free(buf);
+
+    return _tile_width * _tile_height * _tile_count;
+}
+
+// void load_tile_from_image(char *tile_img_filename, int tile_width, int tile_height, char *vram)
+// {
+//     unsigned char *buf = load_file(tile_img_filename);
+//     if (buf == NULL) return;
+
+//     int width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
+//     int height = (unsigned)buf[2] | ((unsigned)buf[3] << 8);
+
+//     unsigned char *buf2 = buf + 4;
+//     unsigned char *vram2 = (unsigned char *)vram;
+//     for(int i = 0; i < height; i += tile_height) {
+//         for(int j = 0; j < width; j += tile_width) {
+//             for (int k = 0; k < tile_height; k++) {
+//                 send_data_to_vram(vram2, 0, buf2 + k * width, tile_width);
+//                 vram2 += tile_width / 4;
+//             }
+//             buf2 += tile_width;
+//         }
+//         buf2 += width * (tile_height - 1);
+//     }
+//     free(buf);
+
+//     _tile_width = tile_width;
+//     _tile_height = tile_height;
+//     _tile_count = (width / _tile_width) * (height / _tile_height);
+// }
+
+
+unsigned int get_image_offs_from_map(unsigned int idx)
+{
+    return idx * _tile_width / 4 * _tile_height;
+}
 
 void draw_one_vert_line(char *vram, int line_x, int map_x)
 {
     int idx = map_x;
     for (int y = 0; y < _map_height; y++) {
         unsigned int tile = _map_data[y*_map_width + map_x];
-        put_vram_to_vram2( vram, line_x, y * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
+        put_vram_to_vram_image( vram, line_x, y * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
         idx += _map_width;
     }
 }
@@ -411,7 +428,7 @@ void recover_bg_area_with_bg_mask(int start_map_x, int start_pos, unsigned long*
         for(int j = 0; j < SCREEN_HEIGHT/_tile_height; j ++) {
             if (mask & 1) {
                 unsigned int tile = _map_data[j*_map_width + map_idx];
-                put_vram_to_vram2( _vram, start_pos + i * _tile_width, j * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
+                put_vram_to_vram_image( _vram, start_pos + i * _tile_width, j * _tile_height, _asset_vram + get_image_offs_from_map(tile), _tile_width, _tile_height );
             }
             mask >>= 1;
         }
@@ -423,59 +440,6 @@ void draw_char(int start_pos, int x, int y, int width, int height, char *vram, u
 {
     put_sprite_vram_to_vram(_vram + start_pos/4, x, y, vram, width, height, img_mask);
     do_bg_masking(x, y, x+width-1, y+height-1, bg_mask);
-}
-
-
-void load_map(char *map_filename)
-{
-    unsigned char *buf = load_file(map_filename);
-    if (buf == NULL) return;
-
-    _map_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
-    _map_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
-    _map_data = (unsigned short *)malloc(_map_width * _map_height * sizeof(short));
-    memcpy(_map_data, buf+8, _map_width * _map_height * sizeof(short));
-    free(buf);
-}
-
-int load_tile(char *tile_filename, char *vram)
-{
-    unsigned char *buf = load_file(tile_filename);
-    if (buf == NULL) return 0;
-    _tile_width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
-    _tile_height = (unsigned)buf[4] | ((unsigned)buf[5] << 8);
-    _tile_count = (unsigned)buf[8] | ((unsigned)buf[9] << 8);
-    send_data_to_vram(vram, 0, buf + 16, _tile_width * _tile_height * _tile_count);
-    free(buf);
-
-    return _tile_width * _tile_height * _tile_count;
-}
-
-void load_tile_from_image(char *tile_img_filename, int tile_width, int tile_height, char *vram)
-{
-    unsigned char *buf = load_file(tile_img_filename);
-    if (buf == NULL) return;
-
-    int width = (unsigned)buf[0] | ((unsigned)buf[1] << 8);
-    int height = (unsigned)buf[2] | ((unsigned)buf[3] << 8);
-
-    unsigned char *buf2 = buf + 4;
-    unsigned char *vram2 = (unsigned char *)vram;
-    for(int i = 0; i < height; i += tile_height) {
-        for(int j = 0; j < width; j += tile_width) {
-            for (int k = 0; k < tile_height; k++) {
-                send_data_to_vram(vram2, 0, buf2 + k * width, tile_width);
-                vram2 += tile_width / 4;
-            }
-            buf2 += tile_width;
-        }
-        buf2 += width * (tile_height - 1);
-    }
-    free(buf);
-
-    _tile_width = tile_width;
-    _tile_height = tile_height;
-    _tile_count = (width / _tile_width) * (height / _tile_height);
 }
 
 void main()
@@ -502,7 +466,7 @@ void main()
     // load_tile_from_image("son_til.img", 8, 8, _asset_vram);
     load_map("son_map.map");
 
-    set_virtual_width(SCREEN_WIDTH * 2 + _tile_width);
+    set_virtual_width(SCREEN_WIDTH * 2 + _tile_width * 2);
 
     char *buf = load_file("sonic.img");
     unsigned char *msk;
@@ -561,28 +525,23 @@ void main()
                     break;
             }
         }
-
         if (status != 0) {
-            delay(100);
             continue;
         }
 
         char_x += char_fling_speed;
-
         scroll_pos += scroll_speed;
-
-        // wait_vsync();
-        int cp_blk = 0;
 
         int new_start_pos = start_pos;
         int new_start_map_x = start_map_x;
+
         if (scroll_pos >= next_pos) {
             if (start_map_x + SCREEN_WIDTH / _tile_width >= _map_width - 1) {
                 status = 2;
                 continue;
             }
 
-            if (next_pos + SCREEN_WIDTH >= (SCREEN_WIDTH * 2 + _tile_width)) {
+            if (next_pos + SCREEN_WIDTH >= (SCREEN_WIDTH * 2 + _tile_width * 2)) {
                 new_start_pos = 0;
                 scroll_pos = 0;
                 rewind = 1;
@@ -594,19 +553,12 @@ void main()
 
             new_start_map_x = start_map_x + 1;
             draw_one_vert_line( _vram, new_start_pos + SCREEN_WIDTH, new_start_map_x + (SCREEN_WIDTH / _tile_width) );
-            if (new_start_pos >= _tile_width) {
-                // copy_vram_to_vram( _vram + (new_start_pos - _tile_width)/4, _vram + (new_start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
-                cp_blk = 1;
+            if (new_start_pos >= _tile_width * 2) {
+                copy_vram_image_to_vram_image( _vram + (new_start_pos - _tile_width * 2)/4, _vram + (new_start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
             }
         }
 
         wait_vsync();
-
-        if (cp_blk) {
-            copy_vram_to_vram( _vram + (new_start_pos - _tile_width)/4, _vram + (new_start_pos + SCREEN_WIDTH)/4, _tile_width, SCREEN_HEIGHT );
-        }
-
-        // for(int i=0; i<50;i++) wait_vsync();
 
         if (!rewind) {
             recover_bg_area_with_bg_mask(start_map_x, start_pos, bg_mask);
@@ -614,11 +566,13 @@ void main()
             clear_bg_mask(bg_mask);
             rewind = 0;
         }
+        
         start_pos = new_start_pos;
         start_map_x = new_start_map_x;
+        // set_start_addr(scroll_pos / 4);
 
-        int x = char_x - start_map_x * _tile_width;
-        draw_char(start_pos, x, char_y, 48, 24, _asset_vram + 20000/4, msk, bg_mask);
+        int x = char_x - new_start_map_x * _tile_width;
+        draw_char(new_start_pos, x, char_y, 48, 24, _asset_vram + 20000/4, msk, bg_mask);
 
         set_start_addr(scroll_pos / 4);
     }
