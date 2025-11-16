@@ -11,6 +11,7 @@
 #include "../src/PALETTE.CPP"
 #include "../src/GDI.CPP"
 #include "../src/IMAGE.CPP"
+#include "../src/SPRITE.CPP"
 
 
 // #define LINES_240
