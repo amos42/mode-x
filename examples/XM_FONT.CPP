@@ -40,8 +40,29 @@ void set_mode3h() {
 // Mode X 초기화 (chain-4 끄고 320x240)
 void mode_x_init() {
     // Sequencer: disable chain-4
-    outp(VGA_SEQ_INDEX, 0x04);
-    outp(VGA_SEQ_DATA, 0x06);
+    // outp(VGA_SEQ_INDEX, 0x04);
+    // outp(VGA_SEQ_DATA, 0x06);
+
+    // none-chain-4 모드
+    outportb(SA_INDEX, SA_MEMORY_MODE);
+    // outportb(SA_DATA, inportb(SA_DATA) & ~(1 << 3));
+    outportb(SA_DATA, 0x06);
+
+    // 스캔 주기 60Hz
+    outportb(MISC_OUTPUT, 0xE3);
+
+    // 1byte 전송 모드
+    outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
+    outportb(CRTC_DATA, 0x00);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~(1 << 5) | (1 << 6));
+    outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
+    outportb(CRTC_DATA, 0xE3);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~((1 << 6) | (1 << 3)));
+
+    // CRTC 수직 해상도 관련 레지스터의 조작을 막는다.
+    outportb(CRTC_INDEX, CRTC_VERTICAL_SYNC_END);
+    outportb(CRTC_DATA, inportb(CRTC_DATA) & 0x7F);
+
 
     // Graphics Controller: set write mode 2 later
     outp(VGA_GC_INDEX, 0x05);

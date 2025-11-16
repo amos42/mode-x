@@ -1,4 +1,9 @@
+#ifndef __MODE_X_H_
 #include "mode_x.h"
+#endif
+#ifndef __VGA_REG_H_
+#include "vga_reg.h"
+#endif
 #include <malloc.h>
 
 
@@ -46,7 +51,7 @@ void make_check_screen(char* buf, int vwidth, int width, int height, char color1
 
 
 // 이미지 마스크 생성
-unsigned char* make_image_mask(char* img, int offs, int width, int height, char trans_color)
+unsigned char* make_image_mask(char* img, int offs, int width, int height, char trans_color, int endian)
 {
     unsigned char* img_mask = (unsigned char*)malloc(width / 8 * height);
 
@@ -55,8 +60,7 @@ unsigned char* make_image_mask(char* img, int offs, int width, int height, char 
             unsigned char m = 0;
             for (int k = 0; k < 8; k++) {
                 if (img[i * width + j * 8 + k] != trans_color) {
-                    m |= (1 << (7 - k));
-                    //m |= (1 << k);
+                    m |= (endian)? (1 << (7 - k)) : (1 << k);
                 }
             }
             img_mask[i * (width / 8) + j] = m;
@@ -65,3 +69,20 @@ unsigned char* make_image_mask(char* img, int offs, int width, int height, char 
 
     return img_mask;
 }
+
+// unsigned char* make_image_mask( char* img, int width, int height, char trans_color, int endian )
+// {
+//     unsigned char* img_mask = (unsigned char*)malloc(width / 8 * height);
+//     for (int i = 0; i < height; i++) {
+//         for (int j = 0; j < width / 8; j++) {
+//             unsigned char m = 0;
+//             for (int k = 0; k < 8; k++) {
+//                 if (img[i * width + j * 8 + k] != trans_color) {
+//                     m |= (endian)? (1 << (7 - k)) : (1 << k);
+//                 }
+//             }
+//             img_mask[i * (width / 8) + j] = m;
+//         }
+//     }
+//     return img_mask;
+// }

@@ -4,164 +4,25 @@
 #include <dos.h>
 #include <mem.h>
 #include <io.h>
+#include "../src/MODE_X.H"
 #include "../src/VGA_REG.H"
 
-
-char* _vram = (char*)0xA0000000;
-int _vwidth = 320 / 4;
-int _vheight = 200;
-
-
-void set_screen_mode(int mode)
-{
-    union REGS regs;
-    regs.h.ah = 0x00;
-    regs.h.al = mode;
-    int86(0x10, &regs, &regs);
-}
-
-void turn_off_chain4()
-{
-    outportb(SA_INDEX, SA_MEMORY_MODE);
-    // outportb(SA_DATA, inportb(SA_DATA) & ~8);
-    outportb(SA_DATA, 0x06);
-
-    outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
-    outportb(CRTC_DATA, 0x00);
-    outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
-    outportb(CRTC_DATA, 0xE3);
-}
-
-void set_crtc_to_240_lines() {
-    outportb(CRTC_INDEX, CRTC_VERT_DISP_ENABLE_END);       // Vertical Display End
-    outportb(CRTC_DATA, 224);        // 줄 수를 400줄로 축소 (144 * 4 = 576 => 실제 400 비슷한 느낌으로 맞춤)
-}
-
-void set_bank_mask(int mask)
-{
-    outportb(SA_INDEX, SA_PLANE_MASK);
-    outportb(SA_DATA, mask);
-}
-
-void select_bank(int bank)
-{
-    set_bank_mask(1 << bank);
-}
-
-void set_palette_multi(unsigned char* pal, int start, int count)
-{
-    outportb(DAC_INDEX, start);
-    for (int i = 0; i < count; i++) {
-        outportb(DAC_DATA, *pal++);
-        outportb(DAC_DATA, *pal++);
-        outportb(DAC_DATA, *pal++);
-    }
-}
-
-void set_write_mode(int mode)
-{
-    outportb(GC_INDEX, GC_MODE);
-    outportb(GC_DATA, inportb(GC_DATA) & 0xFC | mode);
-}
-
-// VRAM 상의 특정 위치에 이미지를 전송한다
-void send_image_to_vram( char *vdes, int offs, char* img, int width, int height )
-{
-    int wloop = width / 4;
-    for (int k = 0; k < 4; k++) {
-        select_bank((offs + k) % 4);
-
-        char* des = vdes;
-        char *src = img + k;
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < wloop; j ++) {
-                *des++ = *src;
-                src += 4;
-            }
-            des += _vwidth - wloop;
-        }
-    }
-}
-
-void put_image_to_vram( char *_vram, int x, int y, char *img, int width, int height )\
-{
-    char* des = _vram + y * _vwidth + x / 4;
-    send_image_to_vram( des, x % 4, img, width, height );
-}
+#include "../src/VGA_CTL.CPP"
+#include "../src/PALETTE.CPP"
+#include "../src/GDI.CPP"
+#include "../src/IMAGE.CPP"
+#include "../src/SPRITE.CPP"
 
 
-unsigned char* make_image_mask( char* img, int width, int height, char trans_color, int endian )
-{
-    unsigned char* img_mask = (unsigned char*)malloc(width / 8 * height);
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width / 8; j++) {
-            unsigned char m = 0;
-            for (int k = 0; k < 8; k++) {
-                if (img[i * width + j * 8 + k] != trans_color) {
-                    m |= (endian)? (1 << (7 - k)) : (1 << k);
-                }
-            }
-            img_mask[i * (width / 8) + j] = m;
-        }
-    }
-    return img_mask;
-}
+// #define LINES_240
 
-// VRAM to VRAM 스프라이트 전송
-void send_sprite_vram_to_vram( char* des, char* src, int width, int height, unsigned char* mask )
-{
-    set_write_mode(1);
+#define SCREEN_WIDTH    (320)
+#ifdef LINES_240
+#define SCREEN_HEIGHT   (240)
+#else
+#define SCREEN_HEIGHT   (200)
+#endif
 
-    int wloop = width / 4;
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < wloop; j += 2) {
-            unsigned char m = *mask++;
-
-            int dummy = *(src + j);
-            set_bank_mask(m);
-            *(des + j) = 0x00;
-
-            dummy = *(src + j + 1);
-            set_bank_mask(m >> 4);
-            *(des + j + 1) = 0x00;
-        }
-        src += _vwidth;
-        des += _vwidth;
-    }
-}
-
-// 스프라이트 그리기
-// void put_sprite_vram_to_vram( char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4] )
-// {
-//     char* des = vram + y * _vwidth + x / 4;
-//     int idx = x & 0x3;
-//     width += (idx != 0) ? 4 : 0;
-//     copy_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
-// }
-void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, int height, unsigned char* mask )
-{
-    char* des = vram + y * _vwidth + x / 4;
-    int idx = x & 0x3;
-    width += (idx != 0) ? 4 : 0;
-    send_sprite_vram_to_vram(des, src, width, height, mask);
-}
-
-void put_image_to_vram_mask( char *vram, int x, int y, unsigned char* mask, int width, int height)
-{
-    char* des = vram + y * _vwidth + x / 4;
-
-    set_write_mode(2);
-
-    set_bank_mask(0xF);
-    for (int i = 0; i < height; i++) {
-        for (int j = 0; j < width / 4; j += 2) {
-            unsigned char m = *mask++;
-            des[j] = m;
-            des[j + 1] = m >> 4;
-        }
-        des += _vwidth;
-    }
-}
 
 char *load_file(char *filename)
 {
@@ -174,46 +35,6 @@ char *load_file(char *filename)
     fclose(fp);
 
     return buf;
-}
-
-void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
-{
-    int i, j;
-    for (i = x1; i <= x2; i++) {
-        buf[y1 * vwidth + i] = color;
-        buf[y2 * vwidth + i] = color;
-    }
-    for (i = y1 + 1; i < y2; i++) {
-        buf[i * vwidth + x1] = color;
-        buf[i * vwidth + x2] = color;
-    }
-}
-
-void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color)
-{
-    int i, j;
-    for (i = y1; i <= y2; i++) {
-        for (j = x1; j <= x2; j++) {
-            buf[i * vwidth + j] = color;
-        }
-    }
-}
-
-// VRAM 상의 특정 위치에 bar를 그린다.
-void draw_bar_to_vram( char *vdes, int offs, int width, int height, char color )
-{
-    int wloop = width / 4;
-    for (int k = 0; k < 4; k++) {
-        select_bank((offs + k) % 4);
-
-        char* des = vdes;
-        for (int i = 0; i < height; i++) {
-            for (int j = 0; j < wloop; j ++) {
-                *des++ = color;
-            }
-            des += _vwidth - wloop;
-        }
-    }
 }
 
 void make_checked_screen(char* buf, int vwidth, int width, int height, char color1, char color2, char color3)

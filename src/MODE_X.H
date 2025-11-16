@@ -42,7 +42,7 @@ void put_font_to_vram(char *vram, unsigned char* font, int x, int y, int width, 
 void draw_box(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color);
 void draw_bar(char* buf, int vwidth, int x1, int y1, int x2, int y2, char color);
 void make_check_screen(char* buf, int vwidth, int width, int height, char color1, char color2, char color3);
-unsigned char* make_image_mask(char* img, int img_x, int img_y, char trans_color);
+unsigned char* make_image_mask(char* img, int offs, int width, int height, char trans_color, int endian);
 
 
 #ifdef __cplusplus

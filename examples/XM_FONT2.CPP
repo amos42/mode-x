@@ -25,41 +25,68 @@ unsigned char font8x8[1][8] = {
     {0x18,0x24,0x24,0x42,0x7E,0x42,0x42,0x00}
 };
 
-// VGA 레지스터 설정
-void set_mode13h() {
+void set_screen_mode(int mode)
+{
     union REGS regs;
     regs.h.ah = 0x00;
-    regs.h.al = 0x13;
-    int86(0x10, &regs, &regs);
-}
-
-void set_mode3h() {
-    union REGS regs;
-    regs.h.ah = 0x00;
-    regs.h.al = 0x03;
+    regs.h.al = mode;
     int86(0x10, &regs, &regs);
 }
 
 // Mode X 초기화 (chain-4 끄고 320x240)
 void mode_x_init() {
     // Sequencer: disable chain-4
-    outp(VGA_SEQ_INDEX, 0x04);
-    outp(VGA_SEQ_DATA, 0x06);
+    // outp(VGA_SEQ_INDEX, 0x04);
+    // outp(VGA_SEQ_DATA, 0x06);
+
+    // none-chain-4 모드
+    outportb(SA_INDEX, SA_MEMORY_MODE);
+    // outportb(SA_DATA, inportb(SA_DATA) & ~(1 << 3));
+    outportb(SA_DATA, 0x06);
+
+    // 스캔 주기 60Hz
+    outportb(MISC_OUTPUT, 0xE3);
+
+    // 1byte 전송 모드
+    outportb(CRTC_INDEX, CRTC_UNDERLINE_LOCATTION);
+    outportb(CRTC_DATA, 0x00);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~(1 << 5) | (1 << 6));
+    outportb(CRTC_INDEX, CRTC_MODE_CONTROL);
+    outportb(CRTC_DATA, 0xE3);
+    // outportb(CRTC_DATA, inportb(CRTC_DATA) & ~((1 << 6) | (1 << 3)));
+
+    // CRTC 수직 해상도 관련 레지스터의 조작을 막는다.
+    outportb(CRTC_INDEX, CRTC_VERTICAL_SYNC_END);
+    outportb(CRTC_DATA, inportb(CRTC_DATA) & 0x7F);
+
 
     // Graphics Controller: set write mode 2 later
-    outp(VGA_GC_INDEX, 0x05);
-    outp(VGA_GC_DATA, 0x00);
+    // outp(VGA_GC_INDEX, 0x05);
+    // outp(VGA_GC_DATA, 0x00);
 
     // CRTC: 늘려서 240 라인 (간단히 일부만 조정)
     // outp(VGA_CRTC_INDEX, 0x09);
     // outp(VGA_CRTC_DATA, 0x40);
 }
 
-// 쓰기 모드2 설정
-void set_write_mode2() {
-    outp(VGA_GC_INDEX, 0x05);
-    outp(VGA_GC_DATA, 0x02); // write mode 2
+void set_write_mode(int mode)
+{
+    outportb(GC_INDEX, GC_MODE);
+    outportb(GC_DATA, inportb(GC_DATA) & 0xFC | mode);
+    // outportb(GC_DATA, mode);
 }
+
+void set_read_mode(int mode)
+{
+    outportb(GC_INDEX, GC_MODE);
+    outportb(GC_DATA, inportb(GC_DATA) & 0x9F | mode << 5);
+}
+
+// 쓰기 모드2 설정
+// void set_write_mode2() {
+//     outp(VGA_GC_INDEX, 0x05);
+//     outp(VGA_GC_DATA, 0x02); // write mode 2
+// }
 
 // 비트마스크 레지스터 설정
 void set_bitmask(unsigned char mask) {
@@ -91,7 +118,7 @@ void draw_char_mode2(int x, int y, char ch, char color)
     unsigned short offset = (y * 80) + (x >> 2); // 바이트 오프셋
     unsigned char* vram = (unsigned char *)MK_FP(VIDEO_SEG, 0);
 
-    set_write_mode2();
+    set_write_mode(2);
 
     for (int row = 0; row < 8; row++) {
         unsigned char fontrow = font8x8[0][row];
@@ -115,7 +142,7 @@ void draw_mask_mode2(int x, int y, unsigned char *mask, int width, int height, c
     unsigned short offset = (y * 80) + (x >> 2); // 바이트 오프셋
     unsigned char* vram = (unsigned char *)MK_FP(VIDEO_SEG, 0);
 
-    set_write_mode2();
+    set_write_mode(2);
     // set_write_func(1);
 
     // outportb(GC_INDEX, GC_ENABLE_SET_RESET); // Set/Reset
@@ -144,8 +171,7 @@ int main()
     char* img;
     unsigned char* img_mask;
 
-    FILE* fp = fopen("hose.img", "rb");
-    fseek(fp, 16 + 1 + 1 + 64 * 4, SEEK_SET);
+    FILE* fp = fopen("sonic.img", "rb");
     fread(&img_x, 2, 1, fp);
     fread(&img_y, 2, 1, fp);
     img = (char*)malloc(img_x * img_y);
@@ -154,14 +180,13 @@ int main()
     // gen image mask
     img_mask = gen_image_mask(img, img_x, img_y, 0xFF);
 
-    set_mode13h();
+    set_screen_mode(0x13);
     mode_x_init();
 
     draw_char_mode2(40, 40, 'A', 12);
     draw_char_mode2(60, 40, 'A', 14);
     draw_mask_mode2(100, 40, img_mask, img_x, img_y, 1);
 
-    getch();
-    set_mode3h();
+    set_screen_mode(0x03);
     return 0;
 }

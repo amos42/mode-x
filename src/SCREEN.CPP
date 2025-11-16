@@ -1,4 +1,9 @@
+#ifndef __MODE_X_H_
 #include "mode_x.h"
+#endif
+#ifndef __VGA_REG_H_
+#include "vga_reg.h"
+#endif
 
 // 화면을 특정 색으로 지운다
 void clear_screen( char *vram, char color )

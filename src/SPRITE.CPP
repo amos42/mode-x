@@ -1,4 +1,9 @@
+#ifndef __MODE_X_H_
 #include "mode_x.h"
+#endif
+#ifndef __VGA_REG_H_
+#include "vga_reg.h"
+#endif
 #include <stdlib.h>
 
 
@@ -69,11 +74,36 @@ void send_sprite_vram_to_vram( char* des, char* src, int width, int height, unsi
     }
 }
 
+void put_sprite_vram_to_vram( char *vram, int x, int y, char *src, int width, int height, unsigned char* mask )
+{
+    char* des = vram + y * _vwidth + x / 4;
+    int idx = x & 0x3;
+    width += (idx != 0) ? 4 : 0;
+    send_sprite_vram_to_vram(des, src, width, height, mask);
+}
+
 // 스프라이트 그리기
-void put_sprite_vram_to_vram( char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4] )
+void put_sprite_vram_to_vram_ext( char *vram, int x, int y, char* imgs[4], int width, int height, unsigned char* mask[4] )
 {
     char* des = vram + y * _vwidth + x / 4;
     int idx = x & 0x3;
     width += (idx != 0) ? 4 : 0;
     send_sprite_vram_to_vram(des, imgs[idx], width, height, mask[idx]);
+}
+
+void put_image_to_vram_mask( char *vram, int x, int y, unsigned char* mask, int width, int height)
+{
+    char* des = vram + y * _vwidth + x / 4;
+
+    set_write_mode(2);
+
+    set_bank_mask(0xF);
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width / 4; j += 2) {
+            unsigned char m = *mask++;
+            des[j] = m;
+            des[j + 1] = m >> 4;
+        }
+        des += _vwidth;
+    }
 }
