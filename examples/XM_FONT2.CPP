@@ -187,6 +187,8 @@ int main()
     draw_char_mode2(60, 40, 'A', 14);
     draw_mask_mode2(100, 40, img_mask, img_x, img_y, 1);
 
+    getch();
+    
     set_screen_mode(0x03);
     return 0;
 }

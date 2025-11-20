@@ -36,46 +36,10 @@ void set_crtc_to_240_lines()
 // chain-4 로직을 끈다
 void turn_off_chain4()
 {
-    // mov     dx,SC_INDEX ; 3c4h
-    // mov     ax,0604h
-    // out     dx,ax   ;disable chain4 mode
-
-    // mov     dx,SC_INDEX ; 3c4h
-    // mov     ax,0100h
-    // out     dx,ax   ;synchronous reset while setting Misc Output for safety, even though clock unchanged
-
-    // mov     dx,MISC_OUTPUT ; 3c2h
-    // mov     al,0e3h
-    // out     dx,al   ;select 25 MHz dot clock & 60 Hz scanning rate
-
-    // mov     dx,SC_INDEX
-    // mov     ax,0300h
-    // out     dx,ax   ;undo reset (restart sequencer)
-
-    // mov     dx,CRTC_INDEX ;reprogram the CRT Controller
-    // mov     al,11h  ;VSync End reg contains register write
-    // out     dx,al   ; protect bit
-
-    // inc     dx      ;CRT Controller Data register
-    // in      al,dx   ;get current VSync End register setting
-    // and     al,7fh  ;remove write protect on various
-    // out     dx,al   ; CRTC registers
-    // dec     dx      ;CRT Controller Index        
-
-    // outport(0x03c4, 0x0604);
-    // outport(0x03c4, 0x0100);
-
-    // outportb(0x03c2, 0xe3);
-
-    // outport(0x03c4, 0x0300);
-
-    // outportb(0x03d4, 0x11);
-    // outportb(0x03d5, inportb(0x03d5) & 0x7F);
-
     // none-chain-4 모드
     outportb(SA_INDEX, SA_MEMORY_MODE);
-    // outportb(SA_DATA, inportb(SA_DATA) & ~8);
-    outportb(SA_DATA, 0x06);
+    outportb(SA_DATA, inportb(SA_DATA) & ~8);
+    // outportb(SA_DATA, 0x06);
 
     // 스캔 주기 60Hz
     outportb(MISC_OUTPUT, 0xE3);
@@ -124,7 +88,9 @@ void wait_vsync()
     // while ((inportb(0x3DA) & 8) != 0);
     // while ((inportb(0x3DA) & 8) == 0);
 
-    asm  mov    dx, 0x3DA
+    asm  {
+        mov    dx, 0x3DA
+    }
     wait_vsync_off:
     asm {
         in      al, dx

@@ -102,9 +102,10 @@ void main()
 
         idx += speed;
         if (idx + SCREEN_WIDTH > bound_idx) {
+            int delta = idx - (bound_idx - SCREEN_WIDTH);
             if (bound_idx + TILE_WIDTH > MAX_SCREEN_WIDTH) {
                 bound_idx = SCREEN_WIDTH;
-                idx = 0 + speed;
+                idx = 0 + delta;
             }
             draw_one_line( bound_idx, tile_idx );
             tile_idx ^= 1;

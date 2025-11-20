@@ -113,9 +113,10 @@ void main()
 
         idx -= speed;
         if (idx < bound_idx) {
+            int delta = bound_idx - idx;
             if (bound_idx + TILE_HEIGHT < 0) {
                 bound_idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT;
-                idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - speed;
+                idx = MAX_SCREEN_HEIGHT - SCREEN_HEIGHT - delta;
             }
             draw_one_line( bound_idx - TILE_HEIGHT, tile_idx );
             tile_idx ^= 1;
