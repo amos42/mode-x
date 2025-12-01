@@ -107,7 +107,6 @@ void main()
         }
 
         if (status != 0) {
-            delay(100);
             continue;
         }
 
